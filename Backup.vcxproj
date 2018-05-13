@@ -19,6 +19,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\backup.h" />
     <ClInclude Include="src\backupConfig.h" />
     <ClInclude Include="src\helpers.h" />
     <ClInclude Include="src\picosha2.h" />
@@ -29,6 +30,7 @@
     <ClCompile Include="src\backup.cpp" />
     <ClCompile Include="src\backupConfig.cpp" />
     <ClCompile Include="src\helpers.cpp" />
+    <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\sqlite3.c" />
     <ClCompile Include="src\sqliteWrapper.cpp" />
   </ItemGroup>

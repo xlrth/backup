@@ -1,26 +1,13 @@
-#include <string>
-#include <vector>
-#include <experimental/filesystem>
 #include <fstream>
 
-#include "picosha2.h"
-
+#include "backup.h"
 #include "backupConfig.h"
 #include "sqliteWrapper.h"
 #include "helpers.h"
+#include "picosha2.h"
 
-
-
-bool        verbose     = false;
-FILE*       logFile     = nullptr;
-
-long long   errorCount  = 0;
-long long   bytesLinked = 0;
-long long   bytesCopied = 0;
-
-
-
-
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// typedefs
 struct Snapshot
 {
     std::experimental::filesystem::path dir;
@@ -29,24 +16,45 @@ struct Snapshot
 };
 
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// globals
+static std::vector<Snapshot>       gSnapshots;
+static std::vector<std::string>    gExcludes;
+static bool                        gVerbose     = false;
+static FILE*                       gLogFile     = nullptr;
+
+static long long   gErrorCount  = 0;
+static long long   gBytesLinked = 0;
+static long long   gBytesCopied = 0;
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// functions
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void BackupSingleRecursive(
+FILE* GetLogFile()
+{
+    // Hack to use the log file in case of an exception
+    return gLogFile;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+static void BackupSingleRecursive(
     const std::experimental::filesystem::path&  source,
-    const std::experimental::filesystem::path&  dest,
-    std::vector<Snapshot>&                      snapshots,
-    const std::vector<std::string>&             excludes)
+    const std::experimental::filesystem::path&  dest)
 {
     std::string sourceStr = source.string();
     std::string destStr = dest.string();
 
     std::string sourceStrUpper = ToUpper(sourceStr);
-    for (const auto& exclude : excludes)
+    for (const auto& exclude : gExcludes)
     {
         if (std::string::npos != sourceStrUpper.find(exclude))
         {
-            Log(logFile, "excluding " + sourceStr);
+            Log(gLogFile, "excluding " + sourceStr);
             return;
         }
     }
@@ -57,7 +65,7 @@ void BackupSingleRecursive(
 
         for (auto& entry : std::experimental::filesystem::directory_iterator(source))
         {
-            BackupSingleRecursive(entry.path(), dest / entry.path().filename(), snapshots, excludes);
+            BackupSingleRecursive(entry.path(), dest / entry.path().filename());
         }
     }
     else
@@ -66,8 +74,8 @@ void BackupSingleRecursive(
         FILE* sourceFileHandle = fopen(sourceStr.c_str(), "r");
         if (sourceFileHandle == nullptr)
         {
-            Log(logFile, "ERROR: Cannot lock " + sourceStr);
-            errorCount++;
+            Log(gLogFile, "ERROR: Cannot lock " + sourceStr);
+            gErrorCount++;
             return;
         }
         VERIFY(sourceFileHandle != nullptr);
@@ -78,9 +86,9 @@ void BackupSingleRecursive(
 
         std::string hash;
         std::string archiveStr;
-        if (snapshots.size() > 1)
+        if (gSnapshots.size() > 1)
         {
-            auto query = StartQuery(snapshots[snapshots.size() - 2].dbHandle, "select SIZE, DATE, HASH, ARCHIVE from HASH indexed by HASH_idx_file where FILE = \"" + source.u8string() + "\"");
+            auto query = StartQuery(gSnapshots[gSnapshots.size() - 2].dbHandle, "select SIZE, DATE, HASH, ARCHIVE from HASH indexed by HASH_idx_file where FILE = \"" + source.u8string() + "\"");
             if (HasData(query))
             {
                 long long archSize = ReadInt(query, 0);
@@ -91,9 +99,9 @@ void BackupSingleRecursive(
                     // ASSUME FILE IS SAME
                     hash = archHash;
                     archiveStr = ReadString(query, 3);
-                    if (verbose)
+                    if (gVerbose)
                     {
-                        Log(logFile, "Skipping hashing: " + sourceStr);
+                        Log(gLogFile, "Skipping hashing: " + sourceStr);
                     }
                 }
                 VERIFY(!HasData(query));
@@ -114,27 +122,27 @@ void BackupSingleRecursive(
         if (!archiveStr.empty())
         {
             // try linking with archive of last snapshot
-            archPath = snapshots[snapshots.size() - 2].dir / std::experimental::filesystem::u8path(archiveStr);
+            archPath = gSnapshots[gSnapshots.size() - 2].dir / std::experimental::filesystem::u8path(archiveStr);
             std::experimental::filesystem::create_hard_link(archPath, dest, errorCode);
             if (!errorCode)
             {
                 linkSucceeded = true;
-                bytesLinked += sourceSize;
-                if (verbose)
+                gBytesLinked += sourceSize;
+                if (gVerbose)
                 {
-                    Log(logFile, "Linked from last snapshot: " + archPath.string() + " to " + destStr);
+                    Log(gLogFile, "Linked from last snapshot: " + archPath.string() + " to " + destStr);
                 }
             }
         }
         if (!linkSucceeded)
         {
             // try to link all other archives with same hash
-            for (int i = (int)snapshots.size() - 1; i >= 0; i--)
+            for (int i = (int)gSnapshots.size() - 1; i >= 0; i--)
             {
-                auto query = StartQuery(snapshots[i].dbHandle, "select ARCHIVE from HASH where HASH = \"" + hash + "\"");
+                auto query = StartQuery(gSnapshots[i].dbHandle, "select ARCHIVE from HASH where HASH = \"" + hash + "\"");
                 while (HasData(query))
                 {
-                    archPath = snapshots[i].dir / std::experimental::filesystem::u8path(ReadString(query, 0));
+                    archPath = gSnapshots[i].dir / std::experimental::filesystem::u8path(ReadString(query, 0));
                     std::experimental::filesystem::create_hard_link(archPath, dest, errorCode);
                     if (errorCode)
                     {
@@ -145,27 +153,27 @@ void BackupSingleRecursive(
                         if (errorCode.value() == 1142)
                         {
                             tooManyLinks = true;
-                            if (verbose)
+                            if (gVerbose)
                             {
-                                Log(logFile, "Too many links: " + archPath.string() + " to " + destStr);
+                                Log(gLogFile, "Too many links: " + archPath.string() + " to " + destStr);
                             }
                         }
                         else
                         {
                             linkFailed = true;
-                            if (verbose)
+                            if (gVerbose)
                             {
-                                Log(logFile, "Linking failed: " + archPath.string() + " to " + destStr + " : " + std::to_string(errorCode.value()) + " " + errorCode.message());
+                                Log(gLogFile, "Linking failed: " + archPath.string() + " to " + destStr + " : " + std::to_string(errorCode.value()) + " " + errorCode.message());
                             }
                         }
                     }
                     else
                     {
                         linkSucceeded = true;
-                        bytesLinked += sourceSize;
-                        if (verbose)
+                        gBytesLinked += sourceSize;
+                        if (gVerbose)
                         {
-                            Log(logFile, "Linked " + archPath.string() + " to " + destStr);
+                            Log(gLogFile, "Linked " + archPath.string() + " to " + destStr);
                         }
                         break;
                     }
@@ -179,36 +187,36 @@ void BackupSingleRecursive(
         }
         if (!linkSucceeded && !tooManyLinks && linkFailed)
         {
-            Log(logFile, "ERROR: Cannot link " + archPath.string() + " to " + destStr + " : " + std::to_string(errorCode.value()) + " " + errorCode.message());
-            errorCount++;
+            Log(gLogFile, "ERROR: Cannot link " + archPath.string() + " to " + destStr + " : " + std::to_string(errorCode.value()) + " " + errorCode.message());
+            gErrorCount++;
         }
         if (!linkSucceeded)
         {
             if (!tooManyLinks)
             {
-                Log(logFile, "adding file, modified: " + TimeAsString(sourceDateTimePoint) + " size: " + std::to_string(sourceSize) + " path: " + sourceStr);
+                Log(gLogFile, "adding file, modified: " + TimeAsString(sourceDateTimePoint) + " size: " + std::to_string(sourceSize) + " path: " + sourceStr);
             }
-            else if (verbose)
+            else if (gVerbose)
             {
-                Log(logFile, "adding second instance (too many links), modified: " + TimeAsString(sourceDateTimePoint) + " size: " + std::to_string(sourceSize) + " path: " + sourceStr);
+                Log(gLogFile, "adding second instance (too many links), modified: " + TimeAsString(sourceDateTimePoint) + " size: " + std::to_string(sourceSize) + " path: " + sourceStr);
             }
             if (!std::experimental::filesystem::copy_file(source, dest))
             {
-                Log(logFile, "ERROR: Cannot copy file from " + sourceStr + " to " + destStr);
-                errorCount++;
+                Log(gLogFile, "ERROR: Cannot copy file from " + sourceStr + " to " + destStr);
+                gErrorCount++;
                 VERIFY(0 == std::fclose(sourceFileHandle));
                 return;
             }
-            bytesCopied += sourceSize;
+            gBytesCopied += sourceSize;
             if (!MakeReadOnly(dest))
             {
-                Log(logFile, "ERROR: Cannot make read-only: " + dest.string());
-                errorCount++;
+                Log(gLogFile, "ERROR: Cannot make read-only: " + dest.string());
+                gErrorCount++;
             }
         }
 
         VERIFY(0 == std::fclose(sourceFileHandle));
-        RunQuery(snapshots.back().dbHandle, "insert or replace into HASH values (\"" + source.u8string() + "\", " + std::to_string(sourceSize) + ", " + std::to_string(sourceDate) + ", \"" + hash + "\", \"" + dest.u8string().substr(snapshots.back().dir.string().length() + 1) + "\")");
+        RunQuery(gSnapshots.back().dbHandle, "insert or replace into HASH values (\"" + source.u8string() + "\", " + std::to_string(sourceSize) + ", " + std::to_string(sourceDate) + ", \"" + hash + "\", \"" + dest.u8string().substr(gSnapshots.back().dir.string().length() + 1) + "\")");
     }
 }
 
@@ -217,8 +225,12 @@ void BackupSingleRecursive(
 void Backup(
     const std::experimental::filesystem::path&              repository,
     const std::vector<std::experimental::filesystem::path>& sources,
-    const std::vector<std::string>&                         excludes)
+    const std::vector<std::string>&                         excludes,
+    bool                                                    verbose)
 {
+    gExcludes = excludes;
+    gVerbose = verbose;
+
     VERIFY(std::experimental::filesystem::exists(repository)
         && std::experimental::filesystem::is_directory(repository));
 
@@ -233,14 +245,13 @@ void Backup(
     }
     std::sort(snapshotsAll.begin(), snapshotsAll.end(), [](const auto& a, const auto& b) {return a.dir > b.dir; });
 
-    std::vector<Snapshot> snapshots;
     for (int snapshotIdx = 0; snapshotIdx < snapshotsAll.size(); snapshotIdx = std::max(1, snapshotIdx << 1))
     {
-        snapshots.push_back(snapshotsAll[snapshotIdx]);
+        gSnapshots.push_back(snapshotsAll[snapshotIdx]);
     }
-    std::reverse(snapshots.begin(), snapshots.end());
+    std::reverse(gSnapshots.begin(), gSnapshots.end());
 
-    for (auto& snapshot : snapshots)
+    for (auto& snapshot : gSnapshots)
     {
         if (std::experimental::filesystem::exists(snapshot.dir / "IN_PROGRESS"))
         {
@@ -255,35 +266,35 @@ void Backup(
 
     auto newRepoDir = repository / CurrentTimeAsString();
 
-    snapshots.push_back({ newRepoDir, newRepoDir / "hash.sqlite", 0 });
+    gSnapshots.push_back({ newRepoDir, newRepoDir / "hash.sqlite", 0 });
 
-    VERIFY(!std::experimental::filesystem::is_directory(snapshots.back().dir));
-    VERIFY(std::experimental::filesystem::create_directory(snapshots.back().dir));
+    VERIFY(!std::experimental::filesystem::is_directory(gSnapshots.back().dir));
+    VERIFY(std::experimental::filesystem::create_directory(gSnapshots.back().dir));
 
-    std::experimental::filesystem::path lockFilePath = snapshots.back().dir / "IN_PROGRESS";
+    std::experimental::filesystem::path lockFilePath = gSnapshots.back().dir / "IN_PROGRESS";
     FILE* lockFile = fopen(lockFilePath.string().c_str(), "w");
     VERIFY(lockFile != nullptr);
 
 
-    std::experimental::filesystem::path logFilePath = snapshots.back().dir / "log.txt";
-    logFile = fopen(logFilePath.string().c_str(), "w");
-    VERIFY(logFile != nullptr);
+    std::experimental::filesystem::path logFilePath = gSnapshots.back().dir / "log.txt";
+    gLogFile = fopen(logFilePath.string().c_str(), "w");
+    VERIFY(gLogFile != nullptr);
 
-    Log(logFile, "backuping to " + snapshots.back().dir.string());
+    Log(gLogFile, "backuping to " + gSnapshots.back().dir.string());
 
-    for (auto& snapshot : snapshots)
+    for (auto& snapshot : gSnapshots)
     {
-        snapshot.dbHandle = OpenDB(snapshot.sqliteFile.string().c_str(), &snapshot != &snapshots.back());
+        snapshot.dbHandle = OpenDB(snapshot.sqliteFile.string().c_str(), &snapshot != &gSnapshots.back());
         RunQuery(snapshot.dbHandle, "pragma cache_size = 1000000");
     }
 
-    RunQuery(snapshots.back().dbHandle, "pragma page_size = 4096");
-    RunQuery(snapshots.back().dbHandle, "pragma synchronous = off");
-    RunQuery(snapshots.back().dbHandle, "pragma secure_delete = off");
-    RunQuery(snapshots.back().dbHandle, "pragma journal_mode = off");
-    RunQuery(snapshots.back().dbHandle, "create table HASH (FILE text not null primary key, SIZE integer not null, DATE integer not null, HASH text not null, ARCHIVE text not null)");
-    RunQuery(snapshots.back().dbHandle, "create index HASH_idx_hash on HASH (HASH, ARCHIVE)");
-    RunQuery(snapshots.back().dbHandle, "create unique index HASH_idx_file on HASH (FILE, SIZE, DATE, HASH, ARCHIVE)");
+    RunQuery(gSnapshots.back().dbHandle, "pragma page_size = 4096");
+    RunQuery(gSnapshots.back().dbHandle, "pragma synchronous = off");
+    RunQuery(gSnapshots.back().dbHandle, "pragma secure_delete = off");
+    RunQuery(gSnapshots.back().dbHandle, "pragma journal_mode = off");
+    RunQuery(gSnapshots.back().dbHandle, "create table HASH (FILE text not null primary key, SIZE integer not null, DATE integer not null, HASH text not null, ARCHIVE text not null)");
+    RunQuery(gSnapshots.back().dbHandle, "create index HASH_idx_hash on HASH (HASH, ARCHIVE)");
+    RunQuery(gSnapshots.back().dbHandle, "create unique index HASH_idx_file on HASH (FILE, SIZE, DATE, HASH, ARCHIVE)");
 
     for (auto& source : sources)
     {
@@ -295,80 +306,34 @@ void Backup(
         std::replace(modified.begin(), modified.end(), '/', '#');
 #endif
 
-        BackupSingleRecursive(source, snapshots.back().dir / modified, snapshots, excludes);
+        BackupSingleRecursive(source, gSnapshots.back().dir / modified);
     }
 
-    for (auto& snapshot : snapshots)
+    for (auto& snapshot : gSnapshots)
     {
         CloseDB(snapshot.dbHandle);
     }
 
-    if (!MakeReadOnly(snapshots.back().sqliteFile))
+    if (!MakeReadOnly(gSnapshots.back().sqliteFile))
     {
-        Log(logFile, "ERROR: Cannot make read-only: " + snapshots.back().sqliteFile.string());
-        errorCount++;
+        Log(gLogFile, "ERROR: Cannot make read-only: " + gSnapshots.back().sqliteFile.string());
+        gErrorCount++;
     }
 
-    Log(logFile, "DONE.");
-    Log(logFile, "Errors: " + std::to_string(errorCount));
-    Log(logFile, "Bytes copied: " + std::to_string(bytesCopied));
-    Log(logFile, "Bytes linked: " + std::to_string(bytesLinked));
+    Log(gLogFile, "DONE.");
+    Log(gLogFile, "Errors: " + std::to_string(gErrorCount));
+    Log(gLogFile, "Bytes copied: " + std::to_string(gBytesCopied));
+    Log(gLogFile, "Bytes linked: " + std::to_string(gBytesLinked));
 
-    VERIFY(0 == std::fclose(logFile));
-    logFile = nullptr;
+    VERIFY(0 == std::fclose(gLogFile));
+    gLogFile = nullptr;
 
     VERIFY(0 == std::fclose(lockFile));
     VERIFY(std::experimental::filesystem::remove(lockFilePath));
 
     if (!MakeReadOnly(logFilePath))
     {
-        Log(logFile, "ERROR: Cannot make read-only: " + logFilePath.string());
-        errorCount++;
+        Log(gLogFile, "ERROR: Cannot make read-only: " + logFilePath.string());
+        gErrorCount++;
     }
-}
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-int main(int argc, char** argv)
-{
-    try
-    {
-        if (argc == 1 || argc > 3 || (argc == 3 && ToUpper(argv[2]) != "-VERBOSE"))
-        {
-            Log(logFile, "usage: backup <config-file> [-verbose]");
-            return 1;
-        }
-
-        if (argc == 3)
-        {
-            verbose = true;
-        }
-
-        std::experimental::filesystem::path                 repository;
-        std::vector<std::experimental::filesystem::path>    sources;
-        std::vector<std::string>                            excludes;
-        readConfig(argv[1], repository, sources, excludes);
-
-        for (auto& exclude : excludes)
-        {
-            exclude = ToUpper(exclude);
-        }
-
-        Backup(repository, sources, excludes);
-
-        return 0;
-    }
-    catch (const std::string& exception)
-    {
-        Log(logFile, std::string("exception: ") + exception);
-    }
-    catch (...)
-    {
-        Log(logFile, "unknown exception");
-    }
-
-    return 1;
 }
