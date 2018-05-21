@@ -19,20 +19,20 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\backup.h" />
-    <ClInclude Include="src\backupConfig.h" />
-    <ClInclude Include="src\helpers.h" />
+    <ClInclude Include="src\Backup.h" />
+    <ClInclude Include="src\BackupConfig.h" />
+    <ClInclude Include="src\Helpers.h" />
     <ClInclude Include="src\picosha2.h" />
     <ClInclude Include="src\sqlite3.h" />
-    <ClInclude Include="src\sqliteWrapper.h" />
+    <ClInclude Include="src\SqliteWrapper.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\backup.cpp" />
-    <ClCompile Include="src\backupConfig.cpp" />
-    <ClCompile Include="src\helpers.cpp" />
-    <ClCompile Include="src\main.cpp" />
+    <ClCompile Include="src\Backup.cpp" />
+    <ClCompile Include="src\BackupConfig.cpp" />
+    <ClCompile Include="src\Helpers.cpp" />
+    <ClCompile Include="src\Main.cpp" />
     <ClCompile Include="src\sqlite3.c" />
-    <ClCompile Include="src\sqliteWrapper.cpp" />
+    <ClCompile Include="src\SqliteWrapper.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

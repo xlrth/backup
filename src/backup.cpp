@@ -2,11 +2,11 @@
 #include <chrono>
 #include <thread>
 
-#include "backup.h"
-#include "backupConfig.h"
-#include "sqliteWrapper.h"
+#include "Backup.h"
+#include "BackupConfig.h"
+#include "SqliteWrapper.h"
 
-#include "helpers.h"
+#include "Helpers.h"
 #include "picosha2.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
