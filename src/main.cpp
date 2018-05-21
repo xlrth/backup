@@ -11,7 +11,7 @@ int main(int argc, char** argv)
     {
         if (argc == 1 || argc > 3 || (argc == 3 && ToUpper(argv[2]) != "-VERBOSE"))
         {
-            Log(nullptr, "usage: backup <config-file> [-verbose]");
+            Log(GetLogFile(), "usage: backup <config-file> [-verbose]");
             return 1;
         }
 
@@ -33,6 +33,10 @@ int main(int argc, char** argv)
     catch (const std::string& exception)
     {
         Log(GetLogFile(), std::string("exception: ") + exception);
+    }
+    catch (const std::exception& exception)
+    {
+        Log(GetLogFile(), std::string("exception: ") + exception.what());
     }
     catch (...)
     {

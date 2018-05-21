@@ -2,7 +2,7 @@
 #include <vector>
 #include <experimental/filesystem>
 
-FILE* GetLogFile();
+std::ofstream& GetLogFile();
 
 void Backup(
     const std::experimental::filesystem::path&              repository,

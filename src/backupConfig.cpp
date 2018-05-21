@@ -11,8 +11,8 @@ void readConfig(
     std::vector<std::experimental::filesystem::path>&   sources, 
     std::vector<std::string>&                           excludes)
 {
-    std::ifstream configFile(configPath);
-    VERIFY(configFile.is_open());
+    std::ifstream configFileHandle(configPath);
+    VERIFY(configFileHandle.is_open());
 
     repository.clear();
     sources.clear();
@@ -20,7 +20,7 @@ void readConfig(
 
     std::string line;
     std::string currentCategory;
-    while (std::getline(configFile, line))
+    while (std::getline(configFileHandle, line))
     {
         if (line.empty())
         {

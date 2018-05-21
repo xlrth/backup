@@ -4,18 +4,36 @@
 
 #include "sqlite3.h"
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+class SqliteWrapper
+{
+public:
+    class Statement
+    {
+    public:
+        Statement(sqlite3_stmt* statement);
+        ~Statement() noexcept(false);
 
-sqlite3* OpenDB(const std::string& path, bool readOnly);
+        bool        HasData();
+        long long   ReadInt(int col);
+        std::string ReadString(int col);
 
-void CloseDB(sqlite3* db);
+    private:
+        sqlite3_stmt* mStatement;
+    };
 
-void RunQuery(sqlite3* db, const std::string& query);
+    SqliteWrapper();
+    SqliteWrapper(const std::string& path, bool readOnly);
+    SqliteWrapper(SqliteWrapper&& other);
+    ~SqliteWrapper() noexcept(false);
 
-sqlite3_stmt* StartQuery(sqlite3* db, const std::string& query);
+    SqliteWrapper& operator = (SqliteWrapper&& other);
 
-void FinalizeQuery(sqlite3_stmt* st);
+    void        Close();
+    void        RunQuery(const std::string& query);
+    Statement   StartQuery(const std::string& query);
 
-bool HasData(sqlite3_stmt* st);
-
-long long ReadInt(sqlite3_stmt* st, int col);
-std::string ReadString(sqlite3_stmt* st, int col);
+private:
+    sqlite3* mDb;
+};
