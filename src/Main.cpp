@@ -19,7 +19,7 @@ int main(int argc, char** argv)
         std::vector<std::experimental::filesystem::path>    sources;
         std::vector<std::string>                            excludes;
 
-        readConfig(argv[1], repository, sources, excludes);
+        ReadConfig(argv[1], repository, sources, excludes);
 
         for (auto& exclude : excludes)
         {

@@ -82,7 +82,7 @@ static void BackupSingleRecursive(
             {
                 break;
             }
-            std::this_thread::sleep_for(std::chrono::microseconds(10));
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
         if (!sourceFileHandle.is_open())
         {
@@ -99,7 +99,8 @@ static void BackupSingleRecursive(
         std::string archiveStr;
         if (gSnapshots.size() > 1)
         {
-            auto query = gSnapshots[gSnapshots.size() - 2].db.StartQuery("select SIZE, DATE, HASH, ARCHIVE from HASH indexed by HASH_idx_file where FILE = \"" + source.u8string() + "\"");
+            auto query = gSnapshots[gSnapshots.size() - 2].db.StartQuery(
+                "select SIZE, DATE, HASH, ARCHIVE from HASH indexed by HASH_idx_file where FILE = \"" + source.u8string() + "\"");
             if (query.HasData())
             {
                 long long archSize = query.ReadInt(0);
@@ -222,7 +223,13 @@ static void BackupSingleRecursive(
             }
         }
 
-        gSnapshots.back().db.RunQuery("insert or replace into HASH values (\"" + source.u8string() + "\", " + std::to_string(sourceSize) + ", " + std::to_string(sourceDate) + ", \"" + hash + "\", \"" + dest.u8string().substr(gSnapshots.back().dir.string().length() + 1) + "\")");
+        gSnapshots.back().db.RunQuery(
+            "insert or replace into HASH values (\"" 
+            + source.u8string() + "\", " + std::to_string(sourceSize) + ", " 
+            + std::to_string(sourceDate) + ", "
+            + "\"" + hash + "\", "
+            + "\"" + dest.u8string().substr(gSnapshots.back().dir.string().length() + 1) + "\""
+            + ")");
     }
 }
 
