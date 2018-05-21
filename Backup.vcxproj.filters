@@ -7,10 +7,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\backupConfig.h">
+    <ClInclude Include="src\Backup.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\helpers.h">
+    <ClInclude Include="src\BackupConfig.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Helpers.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="src\picosha2.h">
@@ -19,30 +22,27 @@
     <ClInclude Include="src\sqlite3.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\sqliteWrapper.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\backup.h">
+    <ClInclude Include="src\SqliteWrapper.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\backup.cpp">
+    <ClCompile Include="src\Backup.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\backupConfig.cpp">
+    <ClCompile Include="src\BackupConfig.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\helpers.cpp">
+    <ClCompile Include="src\Helpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\sqliteWrapper.cpp">
+    <ClCompile Include="src\Main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\SqliteWrapper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\sqlite3.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

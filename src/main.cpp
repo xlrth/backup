@@ -1,6 +1,6 @@
-#include "backup.h"
-#include "backupConfig.h"
-#include "helpers.h"
+#include "Backup.h"
+#include "BackupConfig.h"
+#include "Helpers.h"
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

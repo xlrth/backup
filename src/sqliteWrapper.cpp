@@ -1,8 +1,8 @@
-#include "sqliteWrapper.h"
+#include "SqliteWrapper.h"
 
 #include <assert.h>
 
-#include "helpers.h"
+#include "Helpers.h"
 
 
 

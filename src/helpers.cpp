@@ -5,7 +5,7 @@
 #include <sstream>
 #include <algorithm>
 
-#include "helpers.h"
+#include "Helpers.h"
 
 #ifdef _WIN32 
 #   ifdef _DEBUG
