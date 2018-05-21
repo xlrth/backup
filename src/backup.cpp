@@ -1,8 +1,11 @@
 #include <fstream>
+#include <chrono>
+#include <thread>
 
 #include "backup.h"
 #include "backupConfig.h"
 #include "sqliteWrapper.h"
+
 #include "helpers.h"
 #include "picosha2.h"
 
@@ -12,7 +15,7 @@ struct Snapshot
 {
     std::experimental::filesystem::path dir;
     std::experimental::filesystem::path sqliteFile;
-    sqlite3*                            dbHandle;
+    SqliteWrapper                       db;
 };
 
 
@@ -21,7 +24,7 @@ struct Snapshot
 static std::vector<Snapshot>       gSnapshots;
 static std::vector<std::string>    gExcludes;
 static bool                        gVerbose     = false;
-static FILE*                       gLogFile     = nullptr;
+static std::ofstream               gLogFileHandle;
 
 static long long   gErrorCount  = 0;
 static long long   gBytesLinked = 0;
@@ -34,10 +37,10 @@ static long long   gBytesCopied = 0;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-FILE* GetLogFile()
+std::ofstream& GetLogFile()
 {
     // Hack to use the log file in case of an exception
-    return gLogFile;
+    return gLogFileHandle;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -54,7 +57,7 @@ static void BackupSingleRecursive(
     {
         if (std::string::npos != sourceStrUpper.find(exclude))
         {
-            Log(gLogFile, "excluding " + sourceStr);
+            Log(gLogFileHandle, "excluding " + sourceStr);
             return;
         }
     }
@@ -70,15 +73,23 @@ static void BackupSingleRecursive(
     }
     else
     {
-        // lock file to prevent others from modification
-        FILE* sourceFileHandle = fopen(sourceStr.c_str(), "r");
-        if (sourceFileHandle == nullptr)
+        std::ifstream sourceFileHandle;
+        // lock file to prevent others from modification, sleep and retry in case of failure
+        for (int i = 0; i < 10; i++)
         {
-            Log(gLogFile, "ERROR: Cannot lock " + sourceStr);
+            sourceFileHandle = std::ifstream(sourceStr, std::ios::binary);
+            if (sourceFileHandle.is_open())
+            {
+                break;
+            }
+            std::this_thread::sleep_for(std::chrono::microseconds(10));
+        }
+        if (!sourceFileHandle.is_open())
+        {
+            Log(gLogFileHandle, "ERROR: Cannot lock " + sourceStr);
             gErrorCount++;
             return;
         }
-        VERIFY(sourceFileHandle != nullptr);
 
         long long sourceSize = std::experimental::filesystem::file_size(source);
         auto sourceDateTimePoint = std::experimental::filesystem::last_write_time(source);
@@ -88,30 +99,28 @@ static void BackupSingleRecursive(
         std::string archiveStr;
         if (gSnapshots.size() > 1)
         {
-            auto query = StartQuery(gSnapshots[gSnapshots.size() - 2].dbHandle, "select SIZE, DATE, HASH, ARCHIVE from HASH indexed by HASH_idx_file where FILE = \"" + source.u8string() + "\"");
-            if (HasData(query))
+            auto query = gSnapshots[gSnapshots.size() - 2].db.StartQuery("select SIZE, DATE, HASH, ARCHIVE from HASH indexed by HASH_idx_file where FILE = \"" + source.u8string() + "\"");
+            if (query.HasData())
             {
-                long long archSize = ReadInt(query, 0);
-                long long archDate = ReadInt(query, 1);
-                std::string archHash = ReadString(query, 2);
+                long long archSize = query.ReadInt(0);
+                long long archDate = query.ReadInt(1);
+                std::string archHash = query.ReadString(2);
                 if (archSize == sourceSize && archDate == sourceDate)
                 {
                     // ASSUME FILE IS SAME
                     hash = archHash;
-                    archiveStr = ReadString(query, 3);
+                    archiveStr = query.ReadString(3);
                     if (gVerbose)
                     {
-                        Log(gLogFile, "Skipping hashing: " + sourceStr);
+                        Log(gLogFileHandle, "Skipping hashing: " + sourceStr);
                     }
                 }
-                VERIFY(!HasData(query));
+                VERIFY(!query.HasData());
             }
-            FinalizeQuery(query);
         }
         if (hash.empty())
         {
-            std::ifstream ifs(sourceStr, std::ios::binary);
-            hash = picosha2::hash256_hex_string(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
+            hash = picosha2::hash256_hex_string(std::istreambuf_iterator<char>(sourceFileHandle), std::istreambuf_iterator<char>());
         }
 
         bool tooManyLinks = false;
@@ -130,7 +139,7 @@ static void BackupSingleRecursive(
                 gBytesLinked += sourceSize;
                 if (gVerbose)
                 {
-                    Log(gLogFile, "Linked from last snapshot: " + archPath.string() + " to " + destStr);
+                    Log(gLogFileHandle, "Linked from last snapshot: " + archPath.string() + " to " + destStr);
                 }
             }
         }
@@ -139,10 +148,10 @@ static void BackupSingleRecursive(
             // try to link all other archives with same hash
             for (int i = (int)gSnapshots.size() - 1; i >= 0; i--)
             {
-                auto query = StartQuery(gSnapshots[i].dbHandle, "select ARCHIVE from HASH where HASH = \"" + hash + "\"");
-                while (HasData(query))
+                auto query = gSnapshots[i].db.StartQuery("select ARCHIVE from HASH where HASH = \"" + hash + "\"");
+                while (query.HasData())
                 {
-                    archPath = gSnapshots[i].dir / std::experimental::filesystem::u8path(ReadString(query, 0));
+                    archPath = gSnapshots[i].dir / std::experimental::filesystem::u8path(query.ReadString(0));
                     std::experimental::filesystem::create_hard_link(archPath, dest, errorCode);
                     if (errorCode)
                     {
@@ -155,7 +164,7 @@ static void BackupSingleRecursive(
                             tooManyLinks = true;
                             if (gVerbose)
                             {
-                                Log(gLogFile, "Too many links: " + archPath.string() + " to " + destStr);
+                                Log(gLogFileHandle, "Too many links: " + archPath.string() + " to " + destStr);
                             }
                         }
                         else
@@ -163,7 +172,7 @@ static void BackupSingleRecursive(
                             linkFailed = true;
                             if (gVerbose)
                             {
-                                Log(gLogFile, "Linking failed: " + archPath.string() + " to " + destStr + " : " + std::to_string(errorCode.value()) + " " + errorCode.message());
+                                Log(gLogFileHandle, "Linking failed: " + archPath.string() + " to " + destStr + " : " + std::to_string(errorCode.value()) + " " + errorCode.message());
                             }
                         }
                     }
@@ -173,12 +182,11 @@ static void BackupSingleRecursive(
                         gBytesLinked += sourceSize;
                         if (gVerbose)
                         {
-                            Log(gLogFile, "Linked " + archPath.string() + " to " + destStr);
+                            Log(gLogFileHandle, "Linked " + archPath.string() + " to " + destStr);
                         }
                         break;
                     }
                 }
-                FinalizeQuery(query);
                 if (linkSucceeded)
                 {
                     break;
@@ -187,36 +195,34 @@ static void BackupSingleRecursive(
         }
         if (!linkSucceeded && !tooManyLinks && linkFailed)
         {
-            Log(gLogFile, "ERROR: Cannot link " + archPath.string() + " to " + destStr + " : " + std::to_string(errorCode.value()) + " " + errorCode.message());
+            Log(gLogFileHandle, "ERROR: Cannot link " + archPath.string() + " to " + destStr + " : " + std::to_string(errorCode.value()) + " " + errorCode.message());
             gErrorCount++;
         }
         if (!linkSucceeded)
         {
             if (!tooManyLinks)
             {
-                Log(gLogFile, "adding file, modified: " + TimeAsString(sourceDateTimePoint) + " size: " + std::to_string(sourceSize) + " path: " + sourceStr);
+                Log(gLogFileHandle, "adding file, modified: " + TimeAsString(sourceDateTimePoint) + " size: " + std::to_string(sourceSize) + " path: " + sourceStr);
             }
             else if (gVerbose)
             {
-                Log(gLogFile, "adding second instance (too many links), modified: " + TimeAsString(sourceDateTimePoint) + " size: " + std::to_string(sourceSize) + " path: " + sourceStr);
+                Log(gLogFileHandle, "adding second instance (too many links), modified: " + TimeAsString(sourceDateTimePoint) + " size: " + std::to_string(sourceSize) + " path: " + sourceStr);
             }
             if (!std::experimental::filesystem::copy_file(source, dest))
             {
-                Log(gLogFile, "ERROR: Cannot copy file from " + sourceStr + " to " + destStr);
+                Log(gLogFileHandle, "ERROR: Cannot copy file from " + sourceStr + " to " + destStr);
                 gErrorCount++;
-                VERIFY(0 == std::fclose(sourceFileHandle));
                 return;
             }
             gBytesCopied += sourceSize;
             if (!MakeReadOnly(dest))
             {
-                Log(gLogFile, "ERROR: Cannot make read-only: " + dest.string());
+                Log(gLogFileHandle, "ERROR: Cannot make read-only: " + dest.string());
                 gErrorCount++;
             }
         }
 
-        VERIFY(0 == std::fclose(sourceFileHandle));
-        RunQuery(gSnapshots.back().dbHandle, "insert or replace into HASH values (\"" + source.u8string() + "\", " + std::to_string(sourceSize) + ", " + std::to_string(sourceDate) + ", \"" + hash + "\", \"" + dest.u8string().substr(gSnapshots.back().dir.string().length() + 1) + "\")");
+        gSnapshots.back().db.RunQuery("insert or replace into HASH values (\"" + source.u8string() + "\", " + std::to_string(sourceSize) + ", " + std::to_string(sourceDate) + ", \"" + hash + "\", \"" + dest.u8string().substr(gSnapshots.back().dir.string().length() + 1) + "\")");
     }
 }
 
@@ -241,13 +247,13 @@ void Backup(
         {
             continue;
         }
-        snapshotsAll.push_back({ p, "", 0 });
+        snapshotsAll.push_back({ p });
     }
     std::sort(snapshotsAll.begin(), snapshotsAll.end(), [](const auto& a, const auto& b) {return a.dir > b.dir; });
 
     for (int snapshotIdx = 0; snapshotIdx < snapshotsAll.size(); snapshotIdx = std::max(1, snapshotIdx << 1))
     {
-        gSnapshots.push_back(snapshotsAll[snapshotIdx]);
+        gSnapshots.push_back(std::move(snapshotsAll[snapshotIdx]));
     }
     std::reverse(gSnapshots.begin(), gSnapshots.end());
 
@@ -266,35 +272,35 @@ void Backup(
 
     auto newRepoDir = repository / CurrentTimeAsString();
 
-    gSnapshots.push_back({ newRepoDir, newRepoDir / "hash.sqlite", 0 });
+    gSnapshots.push_back({ newRepoDir, newRepoDir / "hash.sqlite" });
 
     VERIFY(!std::experimental::filesystem::is_directory(gSnapshots.back().dir));
     VERIFY(std::experimental::filesystem::create_directory(gSnapshots.back().dir));
 
     std::experimental::filesystem::path lockFilePath = gSnapshots.back().dir / "IN_PROGRESS";
-    FILE* lockFile = fopen(lockFilePath.string().c_str(), "w");
-    VERIFY(lockFile != nullptr);
+    std::ofstream lockFileHandle(lockFilePath.string());
+    VERIFY(lockFileHandle.is_open());
 
 
     std::experimental::filesystem::path logFilePath = gSnapshots.back().dir / "log.txt";
-    gLogFile = fopen(logFilePath.string().c_str(), "w");
-    VERIFY(gLogFile != nullptr);
+    gLogFileHandle = std::ofstream(logFilePath.string());
+    VERIFY(gLogFileHandle.is_open());
 
-    Log(gLogFile, "backuping to " + gSnapshots.back().dir.string());
+    Log(gLogFileHandle, "backuping to " + gSnapshots.back().dir.string());
 
     for (auto& snapshot : gSnapshots)
     {
-        snapshot.dbHandle = OpenDB(snapshot.sqliteFile.string().c_str(), &snapshot != &gSnapshots.back());
-        RunQuery(snapshot.dbHandle, "pragma cache_size = 1000000");
+        snapshot.db = SqliteWrapper(snapshot.sqliteFile.string().c_str(), &snapshot != &gSnapshots.back());
+        snapshot.db.RunQuery("pragma cache_size = 1000000");
     }
 
-    RunQuery(gSnapshots.back().dbHandle, "pragma page_size = 4096");
-    RunQuery(gSnapshots.back().dbHandle, "pragma synchronous = off");
-    RunQuery(gSnapshots.back().dbHandle, "pragma secure_delete = off");
-    RunQuery(gSnapshots.back().dbHandle, "pragma journal_mode = off");
-    RunQuery(gSnapshots.back().dbHandle, "create table HASH (FILE text not null primary key, SIZE integer not null, DATE integer not null, HASH text not null, ARCHIVE text not null)");
-    RunQuery(gSnapshots.back().dbHandle, "create index HASH_idx_hash on HASH (HASH, ARCHIVE)");
-    RunQuery(gSnapshots.back().dbHandle, "create unique index HASH_idx_file on HASH (FILE, SIZE, DATE, HASH, ARCHIVE)");
+    gSnapshots.back().db.RunQuery("pragma page_size = 4096");
+    gSnapshots.back().db.RunQuery("pragma synchronous = off");
+    gSnapshots.back().db.RunQuery("pragma secure_delete = off");
+    gSnapshots.back().db.RunQuery("pragma journal_mode = off");
+    gSnapshots.back().db.RunQuery("create table HASH (FILE text not null primary key, SIZE integer not null, DATE integer not null, HASH text not null, ARCHIVE text not null)");
+    gSnapshots.back().db.RunQuery("create index HASH_idx_hash on HASH (HASH, ARCHIVE)");
+    gSnapshots.back().db.RunQuery("create unique index HASH_idx_file on HASH (FILE, SIZE, DATE, HASH, ARCHIVE)");
 
     for (auto& source : sources)
     {
@@ -311,29 +317,28 @@ void Backup(
 
     for (auto& snapshot : gSnapshots)
     {
-        CloseDB(snapshot.dbHandle);
+        snapshot.db.Close();
     }
 
     if (!MakeReadOnly(gSnapshots.back().sqliteFile))
     {
-        Log(gLogFile, "ERROR: Cannot make read-only: " + gSnapshots.back().sqliteFile.string());
+        Log(gLogFileHandle, "ERROR: Cannot make read-only: " + gSnapshots.back().sqliteFile.string());
         gErrorCount++;
     }
 
-    Log(gLogFile, "DONE.");
-    Log(gLogFile, "Errors: " + std::to_string(gErrorCount));
-    Log(gLogFile, "Bytes copied: " + std::to_string(gBytesCopied));
-    Log(gLogFile, "Bytes linked: " + std::to_string(gBytesLinked));
+    Log(gLogFileHandle, "DONE.");
+    Log(gLogFileHandle, "Errors: " + std::to_string(gErrorCount));
+    Log(gLogFileHandle, "Bytes copied: " + std::to_string(gBytesCopied));
+    Log(gLogFileHandle, "Bytes linked: " + std::to_string(gBytesLinked));
 
-    VERIFY(0 == std::fclose(gLogFile));
-    gLogFile = nullptr;
+    gLogFileHandle.close();
 
-    VERIFY(0 == std::fclose(lockFile));
+    lockFileHandle.close();
     VERIFY(std::experimental::filesystem::remove(lockFilePath));
 
     if (!MakeReadOnly(logFilePath))
     {
-        Log(gLogFile, "ERROR: Cannot make read-only: " + logFilePath.string());
+        Log(gLogFileHandle, "ERROR: Cannot make read-only: " + logFilePath.string());
         gErrorCount++;
     }
 }

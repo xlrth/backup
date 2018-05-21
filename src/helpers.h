@@ -2,6 +2,7 @@
 
 #include <string>
 #include <experimental/filesystem>
+#include <fstream>
 
 #define VERIFY(expr) if(!(expr)) { throw std::string("\"" #expr "\" failed!"); }
 
@@ -11,6 +12,6 @@ std::string CurrentTimeAsString();
 
 std::string ToUpper(const std::string& str);
 
-void Log(FILE* logFile, const std::string& str);
+void Log(std::ofstream& logFile, const std::string& str);
 
 bool MakeReadOnly(const std::experimental::filesystem::path& file);

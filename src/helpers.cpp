@@ -12,8 +12,6 @@
 #       define WIN32_LEAN_AND_MEAN
         // needed for OutputDebugString
 #       include <Windows.h>
-#       undef min
-#       undef max
 #   endif
 #endif
 
@@ -46,12 +44,11 @@ std::string ToUpper(const std::string& str)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void Log(FILE* logFile, const std::string& str)
+void Log(std::ofstream& logFile, const std::string& str)
 {
-    if (logFile != nullptr)
+    if (logFile.is_open())
     {
-        fputs(str.c_str(), logFile);
-        fputs("\n", logFile);
+        logFile << str << std::endl;
     }
 
     std::cout << str << std::endl;
@@ -68,9 +65,10 @@ bool MakeReadOnly(const std::experimental::filesystem::path& file)
 {
     std::error_code errorCode;
     std::experimental::filesystem::permissions(file,
-          std::experimental::filesystem::perms::owner_read
-        | std::experimental::filesystem::perms::group_read
-        | std::experimental::filesystem::perms::others_read,
+          std::experimental::filesystem::perms::remove_perms
+        | std::experimental::filesystem::perms::owner_write
+        | std::experimental::filesystem::perms::group_write
+        | std::experimental::filesystem::perms::others_write,
         errorCode);
     return !errorCode;
 }
