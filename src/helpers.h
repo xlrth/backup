@@ -5,8 +5,6 @@
 
 #define VERIFY(expr) if(!(expr)) { throw std::string("\"" #expr "\" failed!"); }
 
-std::string StartProcess(const std::string& cmd);
-
 std::string TimeAsString(std::chrono::system_clock::time_point time);
 
 std::string CurrentTimeAsString();

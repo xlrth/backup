@@ -1,4 +1,3 @@
-
 #include "backup.h"
 #include "backupConfig.h"
 #include "helpers.h"
