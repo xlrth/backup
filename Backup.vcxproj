@@ -34,6 +34,10 @@
     <ClCompile Include="src\sqlite3.c" />
     <ClCompile Include="src\SqliteWrapper.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" />
+    <None Include="TODO.md" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{46CA13B2-F1A7-42E3-B574-0FB8EDFC0661}</ProjectGuid>

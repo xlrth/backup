@@ -209,12 +209,29 @@ static void BackupSingleRecursive(
             {
                 Log(gLogFileHandle, "adding second instance (too many links), modified: " + TimeAsString(sourceDateTimePoint) + " size: " + std::to_string(sourceSize) + " path: " + sourceStr);
             }
-            if (!std::experimental::filesystem::copy_file(source, dest))
+            if (!std::experimental::filesystem::copy_file(source, dest, std::experimental::filesystem::copy_options::copy_symlinks))
             {
                 Log(gLogFileHandle, "ERROR: Cannot copy file from " + sourceStr + " to " + destStr);
                 gErrorCount++;
                 return;
             }
+#ifndef _WIN32 // fixes modification date not being copied under linux
+            auto lastWriteTime = std::experimental::filesystem::last_write_time(source, errorCode);
+            if (errorCode)
+            {
+                Log(gLogFileHandle, "ERROR: Cannot read modification date from " + sourceStr);
+                gErrorCount++;
+            }
+            else
+            {
+                std::experimental::filesystem::last_write_time(dest, lastWriteTime, errorCode);
+                if (errorCode)
+                {
+                    Log(gLogFileHandle, "ERROR: Cannot set modification date of " + destStr);
+                    gErrorCount++;
+                }
+            }
+#endif
             gBytesCopied += sourceSize;
             if (!MakeReadOnly(dest))
             {
@@ -224,8 +241,8 @@ static void BackupSingleRecursive(
         }
 
         gSnapshots.back().db.RunQuery(
-            "insert or replace into HASH values (\"" 
-            + source.u8string() + "\", " + std::to_string(sourceSize) + ", " 
+            "insert or replace into HASH values (\""
+            + source.u8string() + "\", " + std::to_string(sourceSize) + ", "
             + std::to_string(sourceDate) + ", "
             + "\"" + hash + "\", "
             + "\"" + dest.u8string().substr(gSnapshots.back().dir.string().length() + 1) + "\""
