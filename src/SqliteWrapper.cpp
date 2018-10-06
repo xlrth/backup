@@ -31,7 +31,8 @@ bool SqliteWrapper::Statement::HasData()
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 long long SqliteWrapper::Statement::ReadInt(int col)
 {
-    assert(sqlite3_column_type(mStatement, col) == SQLITE_INTEGER);
+// disabling assertion: fails for old format snapshots
+//    assert(sqlite3_column_type(mStatement, col) == SQLITE_INTEGER);
     return sqlite3_column_int64(mStatement, col);
 }
 

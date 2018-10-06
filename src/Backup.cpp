@@ -9,6 +9,13 @@
 #include "Helpers.h"
 #include "picosha2.h"
 
+#ifdef _WIN32
+#   define MAX_PATH_LENGTH  _MAX_FILESYS_NAME
+#else
+#   define MAX_PATH_LENGTH  PATH_MAX
+#endif
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // typedefs
 struct Snapshot
@@ -24,6 +31,7 @@ struct Snapshot
 static std::vector<Snapshot>       gSnapshots;
 static std::vector<std::string>    gExcludes;
 static bool                        gVerbose     = false;
+static bool                        gAlwaysHash  = false;
 static std::ofstream               gLogFileHandle;
 
 static long long   gErrorCount  = 0;
@@ -49,6 +57,22 @@ static void BackupSingleRecursive(
     const std::experimental::filesystem::path&  source,
     const std::experimental::filesystem::path&  dest)
 {
+    // WORKAROUND for filesystem misbehaviour due to long paths
+    if (std::wstring(source.c_str()).size() >= MAX_PATH_LENGTH)
+    {
+        std::wstring str(source.c_str());
+        Log(gLogFileHandle, "ERROR: Path is too long: " + std::string(str.begin(), str.end()));
+        gErrorCount++;
+        return;
+    }
+    if (std::wstring(dest.c_str()).size() >= MAX_PATH_LENGTH)
+    {
+        std::wstring str(dest.c_str());
+        Log(gLogFileHandle, "ERROR: Path is too long: " + std::string(str.begin(), str.end()));
+        gErrorCount++;
+        return;
+    }
+
     std::string sourceStr = source.string();
     std::string destStr = dest.string();
 
@@ -97,7 +121,8 @@ static void BackupSingleRecursive(
 
         std::string hash;
         std::string archiveStr;
-        if (gSnapshots.size() > 1)
+
+        if (!gAlwaysHash && gSnapshots.size() > 1)
         {
             auto query = gSnapshots[gSnapshots.size() - 2].db.StartQuery(
                 "select SIZE, DATE, HASH, ARCHIVE from HASH indexed by HASH_idx_file where FILE = \"" + source.u8string() + "\"");
@@ -119,19 +144,21 @@ static void BackupSingleRecursive(
                 VERIFY(!query.HasData());
             }
         }
-        if (hash.empty())
-        {
-            hash = picosha2::hash256_hex_string(std::istreambuf_iterator<char>(sourceFileHandle), std::istreambuf_iterator<char>());
-        }
 
         bool tooManyLinks = false;
         bool linkFailed = false;
         bool linkSucceeded = false;
         std::error_code errorCode;
         std::experimental::filesystem::path archPath;
-        if (!archiveStr.empty())
+
+        if (hash.empty())
+        {
+            hash = picosha2::hash256_hex_string(std::istreambuf_iterator<char>(sourceFileHandle), std::istreambuf_iterator<char>());
+        }
+        else
         {
             // try linking with archive of last snapshot
+            VERIFY(!archiveStr.empty());
             archPath = gSnapshots[gSnapshots.size() - 2].dir / std::experimental::filesystem::u8path(archiveStr);
             std::experimental::filesystem::create_hard_link(archPath, dest, errorCode);
             if (!errorCode)
@@ -256,10 +283,12 @@ void Backup(
     const std::experimental::filesystem::path&              repository,
     const std::vector<std::experimental::filesystem::path>& sources,
     const std::vector<std::string>&                         excludes,
-    bool                                                    verbose)
+    bool                                                    verbose,
+    bool                                                    alwaysHash)
 {
-    gExcludes = excludes;
-    gVerbose = verbose;
+    gExcludes   = excludes;
+    gVerbose    = verbose;
+    gAlwaysHash = alwaysHash;
 
     VERIFY(std::experimental::filesystem::exists(repository)
         && std::experimental::filesystem::is_directory(repository));
@@ -310,6 +339,14 @@ void Backup(
     gLogFileHandle = std::ofstream(logFilePath.string());
     VERIFY(gLogFileHandle.is_open());
 
+    if (gVerbose)
+    {
+        Log(gLogFileHandle, "verbose enabled");
+    }
+    if (gAlwaysHash)
+    {
+        Log(gLogFileHandle, "always hashing enabled");
+    }
     Log(gLogFileHandle, "backuping to " + gSnapshots.back().dir.string());
 
     for (auto& snapshot : gSnapshots)
