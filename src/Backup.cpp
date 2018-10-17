@@ -12,6 +12,7 @@
 #ifdef _WIN32
 #   define MAX_PATH_LENGTH  _MAX_FILESYS_NAME
 #else
+#   include <linux/limits.h>
 #   define MAX_PATH_LENGTH  PATH_MAX
 #endif
 
@@ -58,17 +59,15 @@ static void BackupSingleRecursive(
     const std::experimental::filesystem::path&  dest)
 {
     // WORKAROUND for filesystem misbehaviour due to long paths
-    if (std::wstring(source.c_str()).size() >= MAX_PATH_LENGTH)
+    if (source.native().size() >= MAX_PATH_LENGTH)
     {
-        std::wstring str(source.c_str());
-        Log(gLogFileHandle, "ERROR: Path is too long: " + std::string(str.begin(), str.end()));
+        Log(gLogFileHandle, "ERROR: Path is too long: " + std::string(source.native().begin(), source.native().end()));
         gErrorCount++;
         return;
     }
-    if (std::wstring(dest.c_str()).size() >= MAX_PATH_LENGTH)
+    if (dest.native().size() >= MAX_PATH_LENGTH)
     {
-        std::wstring str(dest.c_str());
-        Log(gLogFileHandle, "ERROR: Path is too long: " + std::string(str.begin(), str.end()));
+        Log(gLogFileHandle, "ERROR: Path is too long: " + std::string(dest.native().begin(), dest.native().end()));
         gErrorCount++;
         return;
     }
