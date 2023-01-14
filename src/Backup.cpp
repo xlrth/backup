@@ -1,6 +1,7 @@
 #include <fstream>
 #include <chrono>
 #include <thread>
+#include <map>
 
 #include "Backup.h"
 #include "BackupConfig.h"
@@ -15,6 +16,38 @@
 #   include <linux/limits.h>
 #   define MAX_PATH_LENGTH  PATH_MAX
 #endif
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// constants
+enum class EEvent
+{
+    ERROR                   ,
+    EXCLUDE                 ,
+    ADD                     ,
+    ADD_ADDITIONAL          ,
+    LINK                    ,
+    LINK_UNCHANGED          ,
+    HASH_CHANGED            ,
+    HASH_NEW                ,
+    HASH_ALWAYS,
+    HASH_SKIP,
+    TOO_MANY_LINKS          ,
+};
+
+std::map<EEvent, EColor> COLOR_MAP
+{
+    { EEvent::ERROR          , EColor::RED          },
+    { EEvent::EXCLUDE        , EColor::BLUE         },
+    { EEvent::ADD            , EColor::YELLOW       },
+    { EEvent::ADD_ADDITIONAL , EColor::MAGENTA      },
+    { EEvent::LINK           , EColor::CYAN         },
+    { EEvent::LINK_UNCHANGED , EColor::GREEN        },
+    { EEvent::HASH_CHANGED   , EColor::DARK_YELLOW  },
+    { EEvent::HASH_NEW       , EColor::DARK_GREEN   },
+    { EEvent::HASH_ALWAYS    , EColor::DARK_GRAY    },
+    { EEvent::HASH_SKIP      , EColor::DARK_GRAY    },
+    { EEvent::TOO_MANY_LINKS , EColor::DARK_MAGENTA },
+};
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -33,7 +66,6 @@ static std::vector<Snapshot>       gSnapshots;
 static std::vector<std::string>    gExcludes;
 static bool                        gVerbose     = false;
 static bool                        gAlwaysHash  = false;
-static std::ofstream               gLogFileHandle;
 
 static long long   gErrorCount  = 0;
 static long long   gBytesLinked = 0;
@@ -46,14 +78,6 @@ static long long   gBytesCopied = 0;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-std::ofstream& GetLogFile()
-{
-    // Hack to use the log file in case of an exception
-    return gLogFileHandle;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
 static void BackupSingleRecursive(
     const std::experimental::filesystem::path&  source,
     const std::experimental::filesystem::path&  dest)
@@ -61,13 +85,13 @@ static void BackupSingleRecursive(
     // WORKAROUND for filesystem misbehaviour due to long paths
     if (source.native().size() >= MAX_PATH_LENGTH)
     {
-        Log(gLogFileHandle, "ERROR: Path is too long: " + std::string(source.native().begin(), source.native().end()));
+        Log("ERROR: Path is too long: " + std::string(source.native().begin(), source.native().end()), COLOR_MAP[EEvent::ERROR]);
         gErrorCount++;
         return;
     }
     if (dest.native().size() >= MAX_PATH_LENGTH)
     {
-        Log(gLogFileHandle, "ERROR: Path is too long: " + std::string(dest.native().begin(), dest.native().end()));
+        Log("ERROR: Path is too long: " + std::string(dest.native().begin(), dest.native().end()), COLOR_MAP[EEvent::ERROR]);
         gErrorCount++;
         return;
     }
@@ -78,11 +102,19 @@ static void BackupSingleRecursive(
     std::string sourceStrUpper = ToUpper(sourceStr);
     for (const auto& exclude : gExcludes)
     {
-        if (std::string::npos != sourceStrUpper.find(exclude))
+        if (exclude.length() < sourceStrUpper.length() && std::mismatch(exclude.rbegin(), exclude.rend(), sourceStrUpper.rbegin())
+            .first == exclude.rend())
         {
-            Log(gLogFileHandle, "excluding " + sourceStr);
+            Log("excluding " + sourceStr, COLOR_MAP[EEvent::EXCLUDE]);
             return;
         }
+    }
+
+    if (!std::experimental::filesystem::exists(source))
+    {
+        Log("ERROR: Cannot find " + sourceStr, COLOR_MAP[EEvent::ERROR]);
+        gErrorCount++;
+        return;
     }
 
     if (std::experimental::filesystem::is_directory(source))
@@ -109,7 +141,7 @@ static void BackupSingleRecursive(
         }
         if (!sourceFileHandle.is_open())
         {
-            Log(gLogFileHandle, "ERROR: Cannot lock " + sourceStr);
+            Log("ERROR: Cannot lock " + sourceStr, COLOR_MAP[EEvent::ERROR]);
             gErrorCount++;
             return;
         }
@@ -118,10 +150,11 @@ static void BackupSingleRecursive(
         auto sourceDateTimePoint = std::experimental::filesystem::last_write_time(source);
         long long sourceDate = sourceDateTimePoint.time_since_epoch().count();
 
-        std::string hash;
-        std::string archiveStr;
+        std::string unchangedArchHash;
+        std::string unchangedArchSubPath;
+        bool fileChanged = false;
 
-        if (!gAlwaysHash && gSnapshots.size() > 1)
+        if (gSnapshots.size() > 1)
         {
             auto query = gSnapshots[gSnapshots.size() - 2].db.StartQuery(
                 "select SIZE, DATE, HASH, ARCHIVE from HASH indexed by HASH_idx_file where FILE = \"" + source.u8string() + "\"");
@@ -129,36 +162,75 @@ static void BackupSingleRecursive(
             {
                 long long archSize = query.ReadInt(0);
                 long long archDate = query.ReadInt(1);
-                std::string archHash = query.ReadString(2);
                 if (archSize == sourceSize && archDate == sourceDate)
                 {
                     // ASSUME FILE IS SAME
-                    hash = archHash;
-                    archiveStr = query.ReadString(3);
-                    if (gVerbose)
-                    {
-                        Log(gLogFileHandle, "Skipping hashing: " + sourceStr);
-                    }
+                    unchangedArchHash = query.ReadString(2);
+                    unchangedArchSubPath = query.ReadString(3);
+                }
+                else
+                {
+                    fileChanged = true;
                 }
                 VERIFY(!query.HasData());
             }
         }
 
-        bool tooManyLinks = false;
-        bool linkFailed = false;
-        bool linkSucceeded = false;
-        std::error_code errorCode;
-        std::experimental::filesystem::path archPath;
+        std::string hash;
 
-        if (hash.empty())
+        if (unchangedArchHash.empty() || gAlwaysHash)
         {
+            if (gVerbose)
+            {
+                std::string reason;
+                EEvent evt;
+                if (fileChanged)
+                {
+                    reason = "File changed";
+                    evt = EEvent::HASH_CHANGED;
+                }
+                else if (unchangedArchHash.empty())
+                {
+                    reason = "Path is new";
+                    evt = EEvent::HASH_NEW;
+                }
+                else
+                {
+                    reason = "Always hashing";
+                    evt = EEvent::HASH_ALWAYS;
+                }
+                
+                Log("Hashing, reason: " + reason + ", date: " + TimeAsString(sourceDateTimePoint) + " size: " + BytesAsString(sourceSize) + " path: " + sourceStr, COLOR_MAP[evt]);
+            }
+
             hash = picosha2::hash256_hex_string(std::istreambuf_iterator<char>(sourceFileHandle), std::istreambuf_iterator<char>());
+            if (!unchangedArchHash.empty() && unchangedArchHash != hash)
+            {
+                Log("ERROR: Supposedly unchanged file with hash mismatch: " + sourceStr, COLOR_MAP[EEvent::ERROR]);
+                gErrorCount++;
+                unchangedArchHash.clear();
+                unchangedArchSubPath.clear();
+            }
         }
         else
         {
+            if (gVerbose)
+            {
+                Log("File seems unchanged, skipping hashing, date: " + TimeAsString(sourceDateTimePoint) + " size: " + BytesAsString(sourceSize) + " path: " + sourceStr, COLOR_MAP[EEvent::HASH_SKIP]);
+            }
+
+            hash = unchangedArchHash;
+        }
+
+        bool tooManyLinks = false;
+        bool linkSucceeded = false;
+        std::error_code errorCode;
+        
+        if (!unchangedArchSubPath.empty())
+        {
+
             // try linking with archive of last snapshot
-            VERIFY(!archiveStr.empty());
-            archPath = gSnapshots[gSnapshots.size() - 2].dir / std::experimental::filesystem::u8path(archiveStr);
+            std::experimental::filesystem::path archPath = gSnapshots[gSnapshots.size() - 2].dir / std::experimental::filesystem::u8path(unchangedArchSubPath);
             std::experimental::filesystem::create_hard_link(archPath, dest, errorCode);
             if (!errorCode)
             {
@@ -166,41 +238,38 @@ static void BackupSingleRecursive(
                 gBytesLinked += sourceSize;
                 if (gVerbose)
                 {
-                    Log(gLogFileHandle, "Linked from last snapshot: " + archPath.string() + " to " + destStr);
+                    Log("Linked archive in last snapshot, date: " + TimeAsString(sourceDateTimePoint) + " size: " + BytesAsString(sourceSize) + " path: " + sourceStr, COLOR_MAP[EEvent::LINK_UNCHANGED]);
                 }
             }
         }
         if (!linkSucceeded)
         {
-            // try to link all other archives with same hash
+            // try to link archives with same hash. Can fail for deleted files or when exceeding hard link count limits
             for (int i = (int)gSnapshots.size() - 1; i >= 0; i--)
             {
-                auto query = gSnapshots[i].db.StartQuery("select ARCHIVE from HASH where HASH = \"" + hash + "\"");
+            	// reverse-iterate to improve likelihood of finding archive with hard link count below max
+                auto query = gSnapshots[i].db.StartQuery("select ARCHIVE from HASH where HASH = \"" + hash + "\" ORDER BY rowid DESC");
                 while (query.HasData())
                 {
-                    archPath = gSnapshots[i].dir / std::experimental::filesystem::u8path(query.ReadString(0));
+                    std::experimental::filesystem::path archPath = gSnapshots[i].dir / std::experimental::filesystem::u8path(query.ReadString(0));
                     std::experimental::filesystem::create_hard_link(archPath, dest, errorCode);
                     if (errorCode)
                     {
-                        //  TODO: OVERHEAD checking all lilnks for recurring content
-                        //  TODO: OVERHEAD checking all lilnks for recurring content
-                        //  TODO: OVERHEAD checking all lilnks for recurring content
-                        //  TODO: OVERHEAD checking all lilnks for recurring content
                         if (errorCode.value() == 1142)
                         {
                             tooManyLinks = true;
                             if (gVerbose)
                             {
-                                Log(gLogFileHandle, "Too many links: " + archPath.string() + " to " + destStr);
+                                Log("Archive has too many links, size: " + BytesAsString(sourceSize) + " path: " + archPath.string(), COLOR_MAP[EEvent::TOO_MANY_LINKS]);
                             }
                         }
                         else
                         {
-                            linkFailed = true;
-                            if (gVerbose)
-                            {
-                                Log(gLogFileHandle, "Linking failed: " + archPath.string() + " to " + destStr + " : " + std::to_string(errorCode.value()) + " " + errorCode.message());
-                            }
+                            Log("ERROR: Cannot link archive, date: " + TimeAsString(sourceDateTimePoint) + " size: " + BytesAsString(sourceSize) + " path: " + sourceStr 
+                                + "    target:    " + archPath.string()
+                                + "    error code:    " + std::to_string(errorCode.value()) + " " + errorCode.message(),
+                                COLOR_MAP[EEvent::ERROR]);
+                            gErrorCount++;
                         }
                     }
                     else
@@ -209,7 +278,9 @@ static void BackupSingleRecursive(
                         gBytesLinked += sourceSize;
                         if (gVerbose)
                         {
-                            Log(gLogFileHandle, "Linked " + archPath.string() + " to " + destStr);
+                            Log("Linked archive, date: " + TimeAsString(sourceDateTimePoint) + " size: " + BytesAsString(sourceSize) + " path: " + sourceStr 
+                                + "    target:    " + archPath.string(),
+                                COLOR_MAP[EEvent::LINK]);
                         }
                         break;
                     }
@@ -220,24 +291,20 @@ static void BackupSingleRecursive(
                 }
             }
         }
-        if (!linkSucceeded && !tooManyLinks && linkFailed)
-        {
-            Log(gLogFileHandle, "ERROR: Cannot link " + archPath.string() + " to " + destStr + " : " + std::to_string(errorCode.value()) + " " + errorCode.message());
-            gErrorCount++;
-        }
+
         if (!linkSucceeded)
         {
             if (!tooManyLinks)
             {
-                Log(gLogFileHandle, "adding file, modified: " + TimeAsString(sourceDateTimePoint) + " size: " + std::to_string(sourceSize) + " path: " + sourceStr);
+                Log("Adding archive, date: " + TimeAsString(sourceDateTimePoint) + " size: " + BytesAsString(sourceSize) + " path: " + sourceStr, COLOR_MAP[EEvent::ADD]);
             }
             else if (gVerbose)
             {
-                Log(gLogFileHandle, "adding second instance (too many links), modified: " + TimeAsString(sourceDateTimePoint) + " size: " + std::to_string(sourceSize) + " path: " + sourceStr);
+                Log("Adding additional instance (too many links), date: " + TimeAsString(sourceDateTimePoint) + " size: " + BytesAsString(sourceSize) + " path: " + sourceStr, COLOR_MAP[EEvent::ADD_ADDITIONAL]);
             }
             if (!std::experimental::filesystem::copy_file(source, dest, std::experimental::filesystem::copy_options::copy_symlinks))
             {
-                Log(gLogFileHandle, "ERROR: Cannot copy file from " + sourceStr + " to " + destStr);
+                Log("ERROR: Cannot copy file from " + sourceStr + " to " + destStr, COLOR_MAP[EEvent::ERROR]);
                 gErrorCount++;
                 return;
             }
@@ -245,7 +312,7 @@ static void BackupSingleRecursive(
             auto lastWriteTime = std::experimental::filesystem::last_write_time(source, errorCode);
             if (errorCode)
             {
-                Log(gLogFileHandle, "ERROR: Cannot read modification date from " + sourceStr);
+                Log("ERROR: Cannot read modification date from " + sourceStr, COLOR_ERROR);
                 gErrorCount++;
             }
             else
@@ -253,7 +320,7 @@ static void BackupSingleRecursive(
                 std::experimental::filesystem::last_write_time(dest, lastWriteTime, errorCode);
                 if (errorCode)
                 {
-                    Log(gLogFileHandle, "ERROR: Cannot set modification date of " + destStr);
+                    Log("ERROR: Cannot set modification date of " + destStr, COLOR_ERROR);
                     gErrorCount++;
                 }
             }
@@ -261,7 +328,7 @@ static void BackupSingleRecursive(
             gBytesCopied += sourceSize;
             if (!MakeReadOnly(dest))
             {
-                Log(gLogFileHandle, "ERROR: Cannot make read-only: " + dest.string());
+                Log("ERROR: Cannot make read-only: " + dest.string(), COLOR_MAP[EEvent::ERROR]);
                 gErrorCount++;
             }
         }
@@ -333,20 +400,17 @@ void Backup(
     std::ofstream lockFileHandle(lockFilePath.string());
     VERIFY(lockFileHandle.is_open());
 
-
-    std::experimental::filesystem::path logFilePath = gSnapshots.back().dir / "log.txt";
-    gLogFileHandle = std::ofstream(logFilePath.string());
-    VERIFY(gLogFileHandle.is_open());
+    InitLog(gSnapshots.back().dir);
 
     if (gVerbose)
     {
-        Log(gLogFileHandle, "verbose enabled");
+        Log("verbose enabled");
     }
     if (gAlwaysHash)
     {
-        Log(gLogFileHandle, "always hashing enabled");
+        Log("always hashing enabled");
     }
-    Log(gLogFileHandle, "backuping to " + gSnapshots.back().dir.string());
+    Log("backuping to " + gSnapshots.back().dir.string());
 
     for (auto& snapshot : gSnapshots)
     {
@@ -359,20 +423,29 @@ void Backup(
     gSnapshots.back().db.RunQuery("pragma secure_delete = off");
     gSnapshots.back().db.RunQuery("pragma journal_mode = off");
     gSnapshots.back().db.RunQuery("create table HASH (FILE text not null primary key, SIZE integer not null, DATE integer not null, HASH text not null, ARCHIVE text not null)");
-    gSnapshots.back().db.RunQuery("create index HASH_idx_hash on HASH (HASH, ARCHIVE)");
+    gSnapshots.back().db.RunQuery("create index HASH_idx_hash on HASH (HASH)");
     gSnapshots.back().db.RunQuery("create unique index HASH_idx_file on HASH (FILE, SIZE, DATE, HASH, ARCHIVE)");
 
     for (auto& source : sources)
     {
-        std::string modified = source.string();
+        std::string sourceMod = source.string();
+
 #ifdef _WIN32
-        std::replace(modified.begin(), modified.end(), ':', '#');
-        std::replace(modified.begin(), modified.end(), '\\', '#');
-#else
-        std::replace(modified.begin(), modified.end(), '/', '#');
+        if (sourceMod.length() == 2 && sourceMod[1] == ':')
+        {
+            sourceMod.append({ '\\' });
+        }
 #endif
 
-        BackupSingleRecursive(source, gSnapshots.back().dir / modified);
+        std::string targetMod = sourceMod;
+
+#ifdef _WIN32
+        std::replace(targetMod.begin(), targetMod.end(), ':', '#');
+        std::replace(targetMod.begin(), targetMod.end(), '\\', '#');
+#endif
+        std::replace(targetMod.begin(), targetMod.end(), '/', '#');
+
+        BackupSingleRecursive(sourceMod, gSnapshots.back().dir / targetMod);
     }
 
     for (auto& snapshot : gSnapshots)
@@ -382,23 +455,17 @@ void Backup(
 
     if (!MakeReadOnly(gSnapshots.back().sqliteFile))
     {
-        Log(gLogFileHandle, "ERROR: Cannot make read-only: " + gSnapshots.back().sqliteFile.string());
+        Log("ERROR: Cannot make read-only: " + gSnapshots.back().sqliteFile.string(), COLOR_MAP[EEvent::ERROR]);
         gErrorCount++;
     }
 
-    Log(gLogFileHandle, "DONE.");
-    Log(gLogFileHandle, "Errors: " + std::to_string(gErrorCount));
-    Log(gLogFileHandle, "Bytes copied: " + std::to_string(gBytesCopied));
-    Log(gLogFileHandle, "Bytes linked: " + std::to_string(gBytesLinked));
+    Log("DONE.");
+    Log("Errors: " + std::to_string(gErrorCount));
+    Log("Bytes copied: " + BytesAsString(gBytesCopied));
+    Log("Bytes linked: " + BytesAsString(gBytesLinked));
 
-    gLogFileHandle.close();
+    CloseLog();
 
     lockFileHandle.close();
     VERIFY(std::experimental::filesystem::remove(lockFilePath));
-
-    if (!MakeReadOnly(logFilePath))
-    {
-        Log(gLogFileHandle, "ERROR: Cannot make read-only: " + logFilePath.string());
-        gErrorCount++;
-    }
 }

@@ -9,7 +9,6 @@ int main(int argc, char** argv)
 {
     try
     {
-
         bool verbose = false;
         bool alwaysHash = false;
         bool usageError = false;
@@ -42,7 +41,7 @@ int main(int argc, char** argv)
 
         if (usageError)
         {
-            Log(GetLogFile(), "usage: backup <config-file> [-verbose] [-always_hash]");
+            Log("usage: backup <config-file> [-verbose] [-always_hash]");
             return 1;
         }
 
@@ -58,21 +57,22 @@ int main(int argc, char** argv)
         }
 
         Backup(repository, sources, excludes, verbose, alwaysHash);
-
-        return 0;
     }
     catch (const std::string& exception)
     {
-        Log(GetLogFile(), std::string("exception: ") + exception);
+        Log(std::string("exception: ") + exception, EColor::RED);
+        return 1;
     }
     catch (const std::exception& exception)
     {
-        Log(GetLogFile(), std::string("exception: ") + exception.what());
+        Log(std::string("exception: ") + exception.what(), EColor::RED);
+        return 1;
     }
     catch (...)
     {
-        Log(GetLogFile(), "unknown exception");
+        Log("unknown exception", EColor::RED);
+        return 1;
     }
 
-    return 1;
+    return 0;
 }
