@@ -6,14 +6,15 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-class SqliteWrapper
+class CSqliteWrapper
 {
 public:
-    class Statement
+    class CStatement
     {
     public:
-        Statement(sqlite3_stmt* statement);
-        ~Statement() noexcept(false);
+        CStatement(CStatement&& other);
+        CStatement(sqlite3_stmt* statement);
+        ~CStatement() noexcept(false);
 
         bool        HasData();
         long long   ReadInt(int col);
@@ -23,16 +24,17 @@ public:
         sqlite3_stmt* mStatement;
     };
 
-    SqliteWrapper();
-    SqliteWrapper(const std::string& path, bool readOnly);
-    SqliteWrapper(SqliteWrapper&& other);
-    ~SqliteWrapper() noexcept(false);
+    CSqliteWrapper();
+    CSqliteWrapper(const std::string& path, bool readOnly);
+    CSqliteWrapper(CSqliteWrapper&& other);
+    ~CSqliteWrapper() noexcept(false);
 
-    SqliteWrapper& operator = (SqliteWrapper&& other);
+    CSqliteWrapper& operator = (CSqliteWrapper&& other);
 
+    bool        IsOpen() const;
     void        Close();
     void        RunQuery(const std::string& query);
-    Statement   StartQuery(const std::string& query);
+    CStatement  StartQuery(const std::string& query);
 
 private:
     sqlite3* mDb;

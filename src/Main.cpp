@@ -1,7 +1,24 @@
-#include "Backup.h"
-#include "BackupConfig.h"
+#include <string>
+#include <deque>
+#include <vector>
+
+#include "COptions.h"
+#include "CBackup.h"
 #include "Helpers.h"
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void printUsage()
+{
+    Log("usage:"                                                                                                                                                                    "\n"
+        "  backup.exe backup   <repository-dir> <source-config-file> [-verbose] [-always_hash] [-hard_link_min_bytes=n]"                                                            "\n"
+        "  backup.exe verify   <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-verify_hashes]"                                                              "\n"
+        "  backup.exe recover  <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot]"                                                                               "\n"
+        "  backup.exe purge    <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot]"                                                                               "\n"
+        "  backup.exe add      <target-snapshot-dir> <source-snapshot-dir> [<source-snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-ignore_path] [-hard_link_min_bytes=n]"   "\n"
+        "  backup.exe subtract <target-snapshot-dir> <source-snapshot-dir> [<source-snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-ignore_path] [-hard_link_min_bytes=n]"   "\n"
+    );
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -9,68 +26,58 @@ int main(int argc, char** argv)
 {
     try
     {
-        bool verbose = false;
-        bool alwaysHash = false;
-        bool usageError = false;
-
-        if (argc < 2)
+        if (argc < 3)
         {
-            usageError = true;
-        }
-
-        while (argc > 2)
-        {
-            if (ToUpper(argv[argc - 1]) == "-VERBOSE")
-            {
-                verbose = true;
-                argc--;
-                continue;
-            }
-            else if (ToUpper(argv[argc - 1]) == "-ALWAYS_HASH")
-            {
-                alwaysHash = true;
-                argc--;
-                continue;
-            }
-            else
-            {
-                usageError = true;
-                break;
-            }
-        }
-
-        if (usageError)
-        {
-            Log("usage: backup <config-file> [-verbose] [-always_hash]");
+            printUsage();
             return 1;
         }
 
-        std::experimental::filesystem::path                 repository;
-        std::vector<std::experimental::filesystem::path>    sources;
-        std::vector<std::string>                            excludes;
+        std::string                                         command = ToUpper(argv[1]);
+        std::deque<std::string>                             arguments(argv + 2, argv + argc);
+        std::vector<CPath>    paths;
 
-        ReadConfig(argv[1], repository, sources, excludes);
-
-        for (auto& exclude : excludes)
+        while (!arguments.empty())
         {
-            exclude = ToUpper(exclude);
+            if (ToUpper(arguments.front()) == "-VERBOSE")
+            {
+                COptions::GetSingletonNonConst().verbose = true;
+            }
+            else if (ToUpper(arguments.front()) == "-ALWAYS_HASH")
+            {
+                COptions::GetSingletonNonConst().alwaysHash = true;
+            }
+            else
+            {
+                paths.push_back(arguments.front());
+            }
+            arguments.pop_front();
         }
 
-        Backup(repository, sources, excludes, verbose, alwaysHash);
+        if (command == "BACKUP")
+        {
+            CBackup backup;
+            backup.Backup(paths);
+        }
+        
+    }
+    catch (const char* exception)
+    {
+        LogFatal(exception);
+        return 1;
     }
     catch (const std::string& exception)
     {
-        Log(std::string("exception: ") + exception, EColor::RED);
+        LogFatal(exception);
         return 1;
     }
     catch (const std::exception& exception)
     {
-        Log(std::string("exception: ") + exception.what(), EColor::RED);
+        LogFatal(exception.what());
         return 1;
     }
     catch (...)
     {
-        Log("unknown exception", EColor::RED);
+        LogFatal("unknown exception");
         return 1;
     }
 

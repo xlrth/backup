@@ -7,10 +7,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\Backup.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\BackupConfig.h">
+    <ClInclude Include="src\CBackup.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Helpers.h">
@@ -22,15 +19,30 @@
     <ClInclude Include="src\sqlite3.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\SqliteWrapper.h">
+    <ClInclude Include="src\CSqliteWrapper.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CSnapshot.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\COptions.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CRepository.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CPath.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CDate.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CRepoFile.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\Backup.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\BackupConfig.cpp">
+    <ClCompile Include="src\CBackup.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Helpers.cpp">
@@ -39,10 +51,19 @@
     <ClCompile Include="src\Main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\SqliteWrapper.cpp">
+    <ClCompile Include="src\CSqliteWrapper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\sqlite3.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CSnapshot.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CRepository.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CRepoFile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

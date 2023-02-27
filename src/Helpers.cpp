@@ -1,11 +1,13 @@
+#include "Helpers.h"
+
 #include <string>
-#include <experimental/filesystem>
 #include <iostream>
+#include <fstream>
 #include <iomanip>
 #include <sstream>
 #include <algorithm>
 
-#include "Helpers.h"
+#include "CPath.h"
 
 #ifdef _WIN32 
 #   include <Windows.h>
@@ -16,25 +18,27 @@ HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 #   endif
 #endif
 
-static std::experimental::filesystem::path  gLogFilePath;
-static std::ofstream                        gLogFileHandle;
+static CPath            gLogFilePath;
+static std::ofstream    gLogFileHandle;
+static int              gSessionErrorCount      = 0;
+static int              gSessionWarningCount    = 0;
+static int              gTotalErrorCount        = 0;
+static int              gTotalWarningCount      = 0;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-std::string BytesAsString(long long bytes, int digits)
+std::string NumberAsString(long long number, int minWidth)
 {
-    int maxLength = digits + digits / 3 - 1;
-
-    std::string str = std::to_string(bytes);
+    std::string str = std::to_string(number);
 
     for (int idx = static_cast<int>(str.length()) - 3; idx > 0; idx -= 3)
     {
         str.insert(str.begin() + idx, ',');
     }
 
-    if (str.length() < maxLength)
+    if (str.length() < minWidth)
     {
-        str = std::string(maxLength - str.length(), ' ') + str;
+        str = std::string(minWidth - str.length(), ' ') + str;
     }
 
     return str;
@@ -62,14 +66,17 @@ std::string CurrentTimeAsString()
 std::string ToUpper(const std::string& str)
 {
     std::string result = str;
-    std::transform(str.begin(), str.end(), result.begin(), ::toupper);
+    std::transform(str.begin(), str.end(), result.begin(), [](char c) { return char(::toupper(c)); });
     return result;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void InitLog(const std::experimental::filesystem::path& basePath)
+void InitLog(const CPath& basePath)
 {
+    gSessionErrorCount = 0;
+    gSessionWarningCount = 0;
+
     gLogFilePath = basePath / "log.txt";
 
     gLogFileHandle = std::ofstream(gLogFilePath.string());
@@ -77,7 +84,7 @@ void InitLog(const std::experimental::filesystem::path& basePath)
 
     if (!::SetConsoleOutputCP(1252))
     {
-        Log("ERROR: SetConsoleCP failed with error code " + ::GetLastError(), EColor::RED);
+        LogWarning("SetConsoleCP failed with error code " + ::GetLastError());
     }
 }
 
@@ -85,12 +92,20 @@ void InitLog(const std::experimental::filesystem::path& basePath)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CloseLog()
 {
+    Log("warnings: " + std::to_string(gSessionWarningCount));
+    Log("errors:   " + std::to_string(gSessionErrorCount));
+
     gLogFileHandle.close();
 
-    if (!MakeReadOnly(gLogFilePath))
-    {
-        Log("ERROR: Cannot make read-only: " + gLogFilePath.string(), EColor::RED);
-    }
+    MakeReadOnly(gLogFilePath);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void LogTotalEventCount()
+{
+    Log("total warnings: " + std::to_string(gTotalWarningCount));
+    Log("total errors:   " + std::to_string(gTotalErrorCount));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -103,7 +118,7 @@ void Log(const std::string& str, EColor color)
     }
 
 #ifdef _WIN32 
-    SetConsoleTextAttribute(hConsole, static_cast<int>(color));
+    SetConsoleTextAttribute(hConsole, static_cast<WORD>(color));
 // alternate solution:
 //    std::cout << "\033[32mThis is green\033[0m" << std::endl;
 #endif
@@ -122,7 +137,34 @@ void Log(const std::string& str, EColor color)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-bool MakeReadOnly(const std::experimental::filesystem::path& file)
+void LogWarning(const std::string& str, const std::error_code& errorCode)
+{
+    Log("WARNING: " + str + (errorCode ? " error: " + errorCode.message() : ""), COLOR_WARNING);
+    gSessionWarningCount++;
+    gTotalWarningCount++;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void LogError(const std::string& str, const std::error_code& errorCode)
+{
+    Log("ERROR: " + str + (errorCode ? " error: " + errorCode.message() : ""), COLOR_ERROR);
+    gSessionErrorCount++;
+    gTotalErrorCount++;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void LogFatal(const std::string& str, const std::error_code& errorCode)
+{
+    Log("FATAL: " + str + (errorCode ? " error: " + errorCode.message() : ""), COLOR_FATAL);
+    gSessionErrorCount++;
+    gTotalErrorCount++;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool MakeReadOnly(const CPath& file)
 {
     std::error_code errorCode;
     std::experimental::filesystem::permissions(file,
@@ -131,5 +173,9 @@ bool MakeReadOnly(const std::experimental::filesystem::path& file)
         | std::experimental::filesystem::perms::group_write
         | std::experimental::filesystem::perms::others_write,
         errorCode);
+    if (errorCode)
+    {
+        LogWarning("cannot make read-only: " + file.string(), errorCode);
+    }
     return !errorCode;
 }

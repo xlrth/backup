@@ -1,1 +1,2 @@
-..\x64\Release\Backup.exe TestConfig.cfg -verbose
+..\x64\Release\Backup.exe backup TestRepository TestConfig.cfg -verbose
+pause
