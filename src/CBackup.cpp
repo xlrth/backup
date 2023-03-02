@@ -1,6 +1,5 @@
 #include "CBackup.h"
 
-#include "CPath.h"
 #include "CRepoFile.h"
 #include "Helpers.h"
 
@@ -101,7 +100,7 @@ void CBackup::BackupSingleRecursive(const CPath& sourcePath, const CPath& target
         repoFile.SetSize(std::experimental::filesystem::file_size(sourcePath));
         repoFile.SetDate(std::experimental::filesystem::last_write_time(sourcePath).time_since_epoch().count());
 
-        CRepoFile lastBackup = mRepository.Find(targetPathRelative, "", mRepository.GetNewestSnapshotIndex());
+        CRepoFile lastBackup = mRepository.FindRepoFile(targetPathRelative, "", mRepository.GetNewestSourceSnapshotIndex());
 
         if (   lastBackup.GetSize() == repoFile.GetSize()
             && lastBackup.GetDate() == repoFile.GetDate())
@@ -164,7 +163,8 @@ void CBackup::Backup(const std::vector<CPath>& paths)
         exclude = ToUpper(exclude);
     }
 
-    mRepository.Init(repositoryPath);
+    mRepository.OpenAllSnapshots(repositoryPath);
+    mRepository.CreateTargetSnapshot(repositoryPath);
 
     InitLog(mRepository.GetTargetSnapshotPath());
 
@@ -208,9 +208,6 @@ void CBackup::Backup(const std::vector<CPath>& paths)
         BackupSingleRecursive(sourceMod, destSuffix);
     }
 
-    Log("DONE.");
-    Log("bytes copied: " + NumberAsString(CRepoFile::StaticGetBytesCopied(), 19));
-    Log("bytes linked: " + NumberAsString(CRepoFile::StaticGetBytesLinked(), 19));
-
+    CRepoFile::StaticLogStats();
     CloseLog();
 }

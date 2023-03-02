@@ -10,6 +10,7 @@ public:
     int mHardLinkMinBytes   = 512 + 1;
     int createNewSnapshot   = 0;
     int verifyHashes        = 0;
+    int writeFileTable      = 0;
     int matchPath           = 0;
 
     void Log() const
@@ -21,6 +22,26 @@ public:
         if (alwaysHash)
         {
             ::Log("always hashing enabled");
+        }
+        if (mHardLinkMinBytes != 512 + 1)
+        {
+            ::Log("min bytes for hard link = " + std::to_string(mHardLinkMinBytes));
+        }
+        if (createNewSnapshot)
+        {
+            ::Log("creating snapshot enabled");
+        }
+        if (verifyHashes)
+        {
+            ::Log("verifying hashes enabled");
+        }
+        if (writeFileTable)
+        {
+            ::Log("writing file table enabled");
+        }
+        if (matchPath)
+        {
+            ::Log("matching paths enabled");
         }
     }
 

@@ -1,12 +1,24 @@
 #include "CRepoFile.h"
 
 #include <thread>
+#include <iomanip>
 
 #include "picosha2.h"
 
 #include "COptions.h"
 #include "Helpers.h"
 
+#ifdef _WIN32
+#   define WIN32_LEAN_AND_MEAN
+#   include <windows.h>
+#   include <io.h> 
+#endif
+
+long long CRepoFile::sFilesHashed = 0;
+long long CRepoFile::sFilesLinked = 0;
+long long CRepoFile::sFilesCopied = 0;
+
+long long CRepoFile::sBytesHashed = 0;
 long long CRepoFile::sBytesLinked = 0;
 long long CRepoFile::sBytesCopied = 0;
 
@@ -149,7 +161,7 @@ bool CRepoFile::OpenSource()
     mSourceFileHandle = std::make_shared<std::ifstream>();
     for (int i = 0; i < 10; i++)
     {
-        mSourceFileHandle->open(mSourcePath.string(), std::ios::binary);
+        mSourceFileHandle->open(mSourcePath.wstring(), std::ios::binary);
         if (mSourceFileHandle->is_open())
         {
             return true;
@@ -178,6 +190,29 @@ bool CRepoFile::HashSource()
         return false;
     }
     mHash = picosha2::hash256_hex_string(std::istreambuf_iterator<char>(*mSourceFileHandle), std::istreambuf_iterator<char>());
+
+    sFilesHashed++;
+    sBytesHashed += GetSize();
+
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool CRepoFile::Hash()
+{
+    std::ifstream file(GetFullPath().wstring(), std::ios::binary);
+    if (!file.is_open())
+    {
+        LogWarning("file not hashable: " + ToString());
+        return false;
+    }
+        
+    mHash = picosha2::hash256_hex_string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+
+    sFilesHashed++;
+    sBytesHashed += GetSize();
+
     return true;
 }
 
@@ -203,7 +238,19 @@ std::string CRepoFile::ToString() const
 {
     return NumberAsString(mSize, 15)
         + " " + TimeAsString(mDate)
-        + " " + GetRelativePath().string();
+        + " " + GetFullPath().string();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+std::string CRepoFile::ToCSV() const
+{
+    std::ostringstream ss;
+    ss << std::setw(12) << mSize;
+
+    return ss.str()
+        + ", " + TimeAsString(mDate)
+        + ", " + GetFullPath().string();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -224,7 +271,9 @@ bool CRepoFile::Copy(const CPath& source) const
         LogWarning("cannot copy: " + ToString() + " from: " + source.string(), errorCode);
         return false;
     }
-    sBytesCopied += std::experimental::filesystem::file_size(source);
+
+    sFilesCopied++;
+    sBytesCopied += GetSize();
 
     LogDebug("copied: " + ToString() + " from: " + source.string(), GetSize() < COptions::GetSingleton().mHardLinkMinBytes ? COLOR_COPY_SMALL : COLOR_COPY);
 
@@ -280,6 +329,8 @@ bool CRepoFile::Link(const CPath& source) const
         }
         return false;
     }
+
+    sFilesLinked++;
     sBytesLinked += GetSize();
 
     LogDebug("linked: " + ToString() + " from: " + source.string(), COLOR_LINK);
@@ -289,14 +340,46 @@ bool CRepoFile::Link(const CPath& source) const
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-long long CRepoFile::StaticGetBytesCopied()
+bool CRepoFile::GetFileInfo(unsigned long long& fileSystemIndex, int& hardLinkCount) const
 {
-    return sBytesCopied;
+    fileSystemIndex = 0;
+    hardLinkCount = 0;
+
+#ifdef _WIN32
+
+    HANDLE handle = CreateFileW(GetFullPath().wstring().c_str(), GENERIC_READ, FILE_SHARE_READ,         NULL, OPEN_EXISTING, 0, NULL);
+    if (handle == INVALID_HANDLE_VALUE)
+    {
+        LogWarning("cannot read file information: " + ToString());
+        return false;
+    }
+
+    BY_HANDLE_FILE_INFORMATION fileInformation;
+    if (!GetFileInformationByHandle(handle, &fileInformation))
+    {
+        LogWarning("cannot read file information: " + ToString());
+        CloseHandle(handle);
+        return false;
+    }
+    CloseHandle(handle);
+
+    fileSystemIndex = (unsigned long long(fileInformation.nFileIndexHigh) << 32) + unsigned long long(fileInformation.nFileIndexLow);
+    hardLinkCount = fileInformation.nNumberOfLinks;
+    return true;
+
+#else
+
+    LogWarning("TODO: implement inode access to avoid multiple hashing of linked files");
+    return false;
+
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-long long CRepoFile::StaticGetBytesLinked()
+void CRepoFile::StaticLogStats()
 {
-    return sBytesLinked;
+    Log("hashed: " + NumberAsString(sFilesHashed, 15) + " files " + NumberAsString(sBytesHashed, 19) + " bytes");
+    Log("copied: " + NumberAsString(sFilesCopied, 15) + " files " + NumberAsString(sBytesCopied, 19) + " bytes");
+    Log("linked: " + NumberAsString(sFilesLinked, 15) + " files " + NumberAsString(sBytesLinked, 19) + " bytes");
 }

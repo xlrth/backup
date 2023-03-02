@@ -40,6 +40,9 @@
     <ClInclude Include="src\CRepoFile.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\CVerify.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\CBackup.cpp">
@@ -64,6 +67,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\CRepoFile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CVerify.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

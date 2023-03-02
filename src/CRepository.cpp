@@ -5,7 +5,14 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void CRepository::Init(const CPath& repositoryPath)
+void CRepository::OpenSnapshot(const CPath& snapshotPath)
+{
+    mSnapshots.emplace_back(snapshotPath, false);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void CRepository::OpenAllSnapshots(const CPath& repositoryPath)
 {
     if (!std::experimental::filesystem::exists(repositoryPath)
         || !std::experimental::filesystem::is_directory(repositoryPath))
@@ -13,82 +20,69 @@ void CRepository::Init(const CPath& repositoryPath)
         throw "repository path invalid: " + repositoryPath.string();
     }
 
-    std::vector<CPath> snapshotsAll;
+    std::vector<CPath> snapshotPaths;
     for (auto& p : std::experimental::filesystem::directory_iterator(repositoryPath))
     {
         if (!std::experimental::filesystem::is_directory(p))
         {
             continue;
         }
-        snapshotsAll.emplace_back(p.path());
-    }
-    std::sort(snapshotsAll.begin(), snapshotsAll.end(), [](const auto& a, const auto& b) {return a < b; });
-
-    for (auto& s : snapshotsAll)
-    {
-        mSnapshots.emplace_back(s, false);
+        snapshotPaths.emplace_back(p.path());
     }
 
-    auto targetSnapshotName = CurrentTimeAsString();
+    std::sort(snapshotPaths.begin(), snapshotPaths.end());
 
-    if (!snapshotsAll.empty() && targetSnapshotName < snapshotsAll.back().filename().string().substr(0, targetSnapshotName.length()))
+    if (!snapshotPaths.empty() && CurrentTimeAsString() < snapshotPaths.back().filename().string().substr(0, CurrentTimeAsString().length()))
     {
         throw "repository snapshot dir names not consistent, some seem to have a date in the future";
     }
+
+    for (auto& s : snapshotPaths)
+    {
+        OpenSnapshot(s);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void CRepository::CreateTargetSnapshot(const CPath& repositoryPath)
+{
+    VERIFY(!mHasTargetSnapshot);
+    mHasTargetSnapshot = true;
 
     mSnapshots.emplace_back(repositoryPath / CurrentTimeAsString(), true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-CRepoFile CRepository::Find(const CPath& relativePath, const std::string& hash, int snapshotIdx)
-{
-    if (snapshotIdx < 0)
-    {
-        return {};
-    }
-
-    auto iterator = mSnapshots[snapshotIdx].Query({ {}, {}, relativePath, CRepoFile::UNSPECIFIED, CRepoFile::UNSPECIFIED, hash });
-    if (iterator.HasFile())
-    {
-        return iterator.GetNextFile();
-    }
-
-    return {};
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-std::vector<CRepoFile> CRepository::EnumAll(int snapshotIdx)
-{
-    if (snapshotIdx < 0)
-    {
-        return {};
-    }
-
-    auto iterator = mSnapshots[snapshotIdx].Query({ {}, {}, {}, CRepoFile::UNSPECIFIED, CRepoFile::UNSPECIFIED, {} });
-
-    std::vector<CRepoFile> result;
-    result.reserve(1000000);
-    while (iterator.HasFile())
-    {
-        result.emplace_back(iterator.GetNextFile());
-    }
-
-    return result;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
 const CPath& CRepository::GetTargetSnapshotPath()
 {
-    if (mSnapshots.empty())
-    {
-        static CPath empty;
-        return empty;
-    }
+    VERIFY(mHasTargetSnapshot);
 
     return mSnapshots.back().GetPath();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+int CRepository::GetTargetSnapshotIndex()
+{
+    VERIFY(mHasTargetSnapshot);
+
+    return int(mSnapshots.size()) - 1;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+int CRepository::GetNewestSourceSnapshotIndex()
+{
+    if (mHasTargetSnapshot)
+    {
+        return int(mSnapshots.size()) - 2;
+    }
+    else
+    {
+        return int(mSnapshots.size()) - 1;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -108,16 +102,41 @@ int CRepository::GetSnapshotIndexByPath(const CPath& path)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-int CRepository::GetTargetSnapshotIndex()
+CRepoFile CRepository::FindRepoFile(const CPath& relativePath, const std::string& hash, int snapshotIdx)
 {
-    return int(mSnapshots.size()) - 1;
+    if (snapshotIdx < 0)
+    {
+        return {};
+    }
+
+    auto iterator = mSnapshots[snapshotIdx].Query({ {}, {}, relativePath, CRepoFile::UNSPECIFIED, CRepoFile::UNSPECIFIED, hash });
+    if (iterator.HasFile())
+    {
+        return iterator.GetNextFile();
+    }
+
+    return {};
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-int CRepository::GetNewestSnapshotIndex()
+std::vector<CRepoFile> CRepository::EnumRepoFiles(int snapshotIdx)
 {
-    return int(mSnapshots.size()) - 2;
+    if (snapshotIdx < 0)
+    {
+        return {};
+    }
+
+    auto iterator = mSnapshots[snapshotIdx].Query({ {}, {}, {}, CRepoFile::UNSPECIFIED, CRepoFile::UNSPECIFIED, {} });
+
+    std::vector<CRepoFile> result;
+    result.reserve(1000000);
+    while (iterator.HasFile())
+    {
+        result.emplace_back(iterator.GetNextFile());
+    }
+
+    return result;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

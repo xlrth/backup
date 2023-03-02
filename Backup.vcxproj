@@ -22,6 +22,7 @@
     <ClInclude Include="src\CBackup.h" />
     <ClInclude Include="src\CDate.h" />
     <ClInclude Include="src\CRepoFile.h" />
+    <ClInclude Include="src\CVerify.h" />
     <ClInclude Include="src\Helpers.h" />
     <ClInclude Include="src\COptions.h" />
     <ClInclude Include="src\CPath.h" />
@@ -33,6 +34,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\CBackup.cpp" />
+    <ClCompile Include="src\CVerify.cpp" />
     <ClCompile Include="src\Helpers.cpp" />
     <ClCompile Include="src\Main.cpp" />
     <ClCompile Include="src\CRepoFile.cpp" />

@@ -4,6 +4,7 @@
 
 #include "COptions.h"
 #include "CBackup.h"
+#include "CVerify.h"
 #include "Helpers.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -12,7 +13,7 @@ void printUsage()
 {
     Log("usage:"                                                                                                                                                                    "\n"
         "  backup.exe backup   <repository-dir> <source-config-file> [-verbose] [-always_hash] [-hard_link_min_bytes=n]"                                                            "\n"
-        "  backup.exe verify   <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-verify_hashes]"                                                              "\n"
+        "  backup.exe verify   <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-verify_hashes] [-write_file_table]"                                           "\n"
         "  backup.exe recover  <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot]"                                                                               "\n"
         "  backup.exe purge    <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot]"                                                                               "\n"
         "  backup.exe add      <target-snapshot-dir> <source-snapshot-dir> [<source-snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-ignore_path] [-hard_link_min_bytes=n]"   "\n"
@@ -46,6 +47,14 @@ int main(int argc, char** argv)
             {
                 COptions::GetSingletonNonConst().alwaysHash = true;
             }
+            else if (ToUpper(arguments.front()) == "-VERIFY_HASHES")
+            {
+                COptions::GetSingletonNonConst().verifyHashes = true;
+            }
+            else if (ToUpper(arguments.front()) == "-WRITE_FILE_TABLE")
+            {
+                COptions::GetSingletonNonConst().writeFileTable = true;
+            }
             else
             {
                 paths.push_back(arguments.front());
@@ -57,6 +66,11 @@ int main(int argc, char** argv)
         {
             CBackup backup;
             backup.Backup(paths);
+        }
+        else if (command == "VERIFY")
+        {
+            CVerify verify;
+            verify.Verify(paths);
         }
         
     }

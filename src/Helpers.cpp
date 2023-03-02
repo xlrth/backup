@@ -18,12 +18,15 @@ HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
 #   endif
 #endif
 
+static std::chrono::system_clock::time_point gStartTime;
+
 static CPath            gLogFilePath;
 static std::ofstream    gLogFileHandle;
-static int              gSessionErrorCount      = 0;
-static int              gSessionWarningCount    = 0;
-static int              gTotalErrorCount        = 0;
-static int              gTotalWarningCount      = 0;
+
+static int  gSessionErrorCount      = 0;
+static int  gSessionWarningCount    = 0;
+static int  gTotalErrorCount        = 0;
+static int  gTotalWarningCount      = 0;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,11 +77,12 @@ std::string ToUpper(const std::string& str)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void InitLog(const CPath& basePath)
 {
+    gStartTime = std::chrono::system_clock::now();
+
     gSessionErrorCount = 0;
     gSessionWarningCount = 0;
 
-    gLogFilePath = basePath / "log.txt";
-
+    gLogFilePath = basePath / ("log_" + CurrentTimeAsString() + ".txt");
     gLogFileHandle = std::ofstream(gLogFilePath.string());
     VERIFY(gLogFileHandle.is_open());
 
@@ -92,12 +96,15 @@ void InitLog(const CPath& basePath)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CloseLog()
 {
+    Log("elapsed time: " + std::to_string(std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - gStartTime).count()) + "s");
     Log("warnings: " + std::to_string(gSessionWarningCount));
     Log("errors:   " + std::to_string(gSessionErrorCount));
 
-    gLogFileHandle.close();
-
-    MakeReadOnly(gLogFilePath);
+    if (gLogFileHandle.is_open())
+    {
+        gLogFileHandle.close();
+        MakeReadOnly(gLogFilePath);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

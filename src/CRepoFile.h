@@ -43,18 +43,22 @@ public:
     void CloseSource();
     bool HashSource();
 
+    bool Hash();
+
     CPath GetFullPath() const;
 
     std::string SourceToString() const;
     std::string ToString() const;
+    std::string ToCSV() const;
 
     bool Copy(const CPath& source) const;
 
     bool Link(const CPath& source) const;
 
+    bool GetFileInfo(unsigned long long& fileSystemIndex, int& hardLinkCount) const;
+
 public: // static
-    static long long StaticGetBytesCopied();
-    static long long StaticGetBytesLinked();
+    static void StaticLogStats();
 
 private:
     CPath           mSourcePath;
@@ -67,6 +71,11 @@ private:
     std::shared_ptr<std::ifstream>   mSourceFileHandle;
 
 private: // static
+    static long long   sFilesHashed;
+    static long long   sFilesCopied;
+    static long long   sFilesLinked;
+
+    static long long   sBytesHashed;
     static long long   sBytesCopied;
     static long long   sBytesLinked;
 };

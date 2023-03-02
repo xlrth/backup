@@ -6,12 +6,12 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>backup TestRepository TestConfig.cfg -verbose</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>verify TestRepository/2023-02-27_22-47-46 -verbose -verify_hashes -write_file_table</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(ProjectDir)/test</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommandArguments>backup TestRepository TestConfig.cfg -verbose</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>verify TestRepository/2023-02-27_22-47-46 -verbose -verify_hashes -write_file_table</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>$(ProjectDir)/test</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
