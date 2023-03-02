@@ -33,15 +33,15 @@ public: // methods
     void Close();
 
     void Insert(const CRepoFile& file);
-    CIterator Query(const CRepoFile& constraints) const;
+    CIterator Query(const CRepoFile& constraints);
 
 private:
     void InitRead();
     void InitWrite();
 
-    CPath                               mPath;
-    CPath                               mSqliteFile;
-    mutable CSqliteWrapper              mDb;
-    CPath                               mLockFilePath;
-    std::ofstream                       mLockFileHandle;
+    CPath           mPath;
+    CPath           mSqliteFile;
+    CSqliteWrapper  mDb;
+    CPath           mLockFilePath;
+    std::ofstream   mLockFileHandle;
 };

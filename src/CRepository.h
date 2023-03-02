@@ -1,10 +1,7 @@
 #pragma once
 
-#include <string>
 #include <vector>
-#include <experimental/filesystem>
 
-#include "COptions.h"
 #include "CPath.h"
 #include "CRepoFile.h"
 #include "CSnapshot.h"
@@ -17,14 +14,11 @@ public:
 
     void CreateTargetSnapshot(const CPath& repositoryPath);
 
-    const CPath&    GetTargetSnapshotPath();
-    int             GetTargetSnapshotIndex();
-    int             GetNewestSourceSnapshotIndex();
-    int             GetSnapshotIndexByPath(const CPath& path);
+    const CPath&    GetTargetSnapshotPath() const;
+    int             GetTargetSnapshotIndex() const;
+    int             GetNewestSourceSnapshotIndex() const;
+    int             GetSnapshotIndexByPath(const CPath& path) const;
 
-
-//    const std::vector<CSnapshot>& GetAllSnapshots() const;
-//    const CSnapshot& GetCurrentSnapshot() const;
 
     // find           by suffix                     in last snapshot                        OFTEN               backup
     // find           by suffix, hash               in source snapshot                      OFTEN               subtract

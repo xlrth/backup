@@ -9,20 +9,17 @@
 class CBackup
 {
 public:
-    void Backup(const std::vector<CPath>& paths);
+    static void Run(const std::vector<CPath>& paths);
 
-private: // methods
-    void ReadConfig(
+private: // static methods
+    static void ReadConfig(
         const CPath&                configPath, 
         std::vector<CPath>&         sources,
         std::vector<std::string>&   excludes);
 
-    void BackupSingleRecursive(const CPath& source, const CPath& destLocal);
-
-private: // variables
-    CRepository                 mRepository;
-    std::vector<std::string>    mExcludes;
+    static void BackupSingleRecursive(
+        const CPath&                    sourcePath,
+        const CPath&                    targetPathRelative,
+        const std::vector<std::string>& excludes,
+        CRepository&                    repository);
 };
-
-
-

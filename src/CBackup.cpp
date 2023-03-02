@@ -1,7 +1,75 @@
 #include "CBackup.h"
 
+#include "COptions.h"
 #include "CRepoFile.h"
 #include "Helpers.h"
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void CBackup::Run(const std::vector<CPath>& paths)
+{
+    VERIFY(paths.size() == 2);
+
+    CPath                       repositoryPath = paths[0];
+    std::vector<CPath>          sources;
+    std::vector<std::string>    excludes;
+
+    ReadConfig(paths[1], sources, excludes);
+
+    for (auto& exclude : excludes)
+    {
+        exclude = ToUpper(exclude);
+    }
+
+    CRepository repository;
+    repository.OpenAllSnapshots(repositoryPath);
+    repository.CreateTargetSnapshot(repositoryPath);
+
+    InitLog(repository.GetTargetSnapshotPath());
+
+    COptions::GetSingleton().Log();
+
+    Log("backuping to " + repository.GetTargetSnapshotPath().string());
+
+    for (auto& source : sources)
+    {
+        std::string sourceStrMod = source.string();
+
+#ifdef _WIN32
+        if (sourceStrMod.length() == 2 && sourceStrMod[1] == ':')
+        {
+            sourceStrMod.append({ '\\' });
+        }
+#endif
+
+        std::string destStrMod = sourceStrMod;
+
+#ifdef _WIN32
+        std::replace(destStrMod.begin(), destStrMod.end(), ':', '#');
+        std::replace(destStrMod.begin(), destStrMod.end(), '\\', '#');
+#endif
+        std::replace(destStrMod.begin(), destStrMod.end(), '/', '#');
+
+        auto sourceMod = CPath(std::experimental::filesystem::u8path(sourceStrMod));
+        auto destSuffix = CPath(std::experimental::filesystem::u8path(destStrMod));
+
+        for (int number = 1; number < 100; number++)
+        {
+            auto dest = repository.GetTargetSnapshotPath() / destSuffix;
+            if (!std::experimental::filesystem::exists(dest))
+            {
+                break;
+            }
+            destSuffix = CPath(std::experimental::filesystem::u8path(destStrMod + "_" + std::to_string(number)));
+            LogWarning("destination already exists, adding suffix and trying again: " + destSuffix.string());
+        }
+
+        BackupSingleRecursive(sourceMod, destSuffix, excludes, repository);
+    }
+
+    CRepoFile::StaticLogStats();
+    CloseLog();
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -57,10 +125,14 @@ void CBackup::ReadConfig(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void CBackup::BackupSingleRecursive(const CPath& sourcePath, const CPath& targetPathRelative)
+void CBackup::BackupSingleRecursive(
+        const CPath&                    sourcePath,
+        const CPath&                    targetPathRelative,
+        const std::vector<std::string>& excludes,
+        CRepository&                    repository)
 {
     std::string sourceStrUpper = ToUpper(sourcePath.string());
-    for (const auto& exclude : mExcludes)
+    for (const auto& exclude : excludes)
     {
         if (exclude.length() < sourceStrUpper.length() && std::mismatch(exclude.rbegin(), exclude.rend(), sourceStrUpper.rbegin())
             .first == exclude.rend())
@@ -80,7 +152,7 @@ void CBackup::BackupSingleRecursive(const CPath& sourcePath, const CPath& target
     {
         for (auto& entry : std::experimental::filesystem::directory_iterator(sourcePath))
         {
-            BackupSingleRecursive(entry.path(), targetPathRelative / CPath(entry.path().filename()));
+            BackupSingleRecursive(entry.path(), targetPathRelative / CPath(entry.path().filename()), excludes, repository);
         }
     }
     else
@@ -100,7 +172,7 @@ void CBackup::BackupSingleRecursive(const CPath& sourcePath, const CPath& target
         repoFile.SetSize(std::experimental::filesystem::file_size(sourcePath));
         repoFile.SetDate(std::experimental::filesystem::last_write_time(sourcePath).time_since_epoch().count());
 
-        CRepoFile lastBackup = mRepository.FindRepoFile(targetPathRelative, "", mRepository.GetNewestSourceSnapshotIndex());
+        CRepoFile lastBackup = repository.FindRepoFile(targetPathRelative, "", repository.GetNewestSourceSnapshotIndex());
 
         if (   lastBackup.GetSize() == repoFile.GetSize()
             && lastBackup.GetDate() == repoFile.GetDate())
@@ -133,81 +205,16 @@ void CBackup::BackupSingleRecursive(const CPath& sourcePath, const CPath& target
             }
         }
 
-        if (mRepository.Duplicate(repoFile))
+        if (repository.Duplicate(repoFile))
         {
             return;
         }
 
         Log("importing: " + repoFile.SourceToString(), COLOR_ADD);
 
-        if (!mRepository.Import(repoFile))
+        if (!repository.Import(repoFile))
         {
             LogError("cannot import new, excluding: " + repoFile.SourceToString());
         }
     }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-void CBackup::Backup(const std::vector<CPath>& paths)
-{
-    VERIFY(paths.size() == 2);
-
-    CPath                 repositoryPath = paths[0];
-    std::vector<CPath>    sources;
-
-    ReadConfig(paths[1], sources, mExcludes);
-
-    for (auto& exclude : mExcludes)
-    {
-        exclude = ToUpper(exclude);
-    }
-
-    mRepository.OpenAllSnapshots(repositoryPath);
-    mRepository.CreateTargetSnapshot(repositoryPath);
-
-    InitLog(mRepository.GetTargetSnapshotPath());
-
-    COptions::GetSingleton().Log();
-
-    Log("backuping to " + mRepository.GetTargetSnapshotPath().string());
-
-    for (auto& source : sources)
-    {
-        std::string sourceStrMod = source.string();
-
-#ifdef _WIN32
-        if (sourceStrMod.length() == 2 && sourceStrMod[1] == ':')
-        {
-            sourceStrMod.append({ '\\' });
-        }
-#endif
-
-        std::string destStrMod = sourceStrMod;
-
-#ifdef _WIN32
-        std::replace(destStrMod.begin(), destStrMod.end(), ':', '#');
-        std::replace(destStrMod.begin(), destStrMod.end(), '\\', '#');
-#endif
-        std::replace(destStrMod.begin(), destStrMod.end(), '/', '#');
-
-        auto sourceMod = CPath(std::experimental::filesystem::u8path(sourceStrMod));
-        auto destSuffix = CPath(std::experimental::filesystem::u8path(destStrMod));
-
-        for (int number = 1; number < 100; number++)
-        {
-            auto dest = mRepository.GetTargetSnapshotPath() / destSuffix;
-            if (!std::experimental::filesystem::exists(dest))
-            {
-                break;
-            }
-            destSuffix = CPath(std::experimental::filesystem::u8path(destStrMod + "_" + std::to_string(number)));
-            LogWarning("destination already exists, adding suffix and trying again: " + destSuffix.string());
-        }
-
-        BackupSingleRecursive(sourceMod, destSuffix);
-    }
-
-    CRepoFile::StaticLogStats();
-    CloseLog();
 }

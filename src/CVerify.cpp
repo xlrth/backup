@@ -5,12 +5,14 @@
 #include <map>
 
 #include "CPath.h"
+#include "COptions.h"
+#include "CRepository.h"
 #include "CRepoFile.h"
 #include "Helpers.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void CVerify::Verify(const std::vector<CPath>& snapshotPaths)
+void CVerify::Run(const std::vector<CPath>& snapshotPaths)
 {
     InitLog("");
 

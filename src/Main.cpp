@@ -13,7 +13,7 @@ void printUsage()
 {
     Log("usage:"                                                                                                                                                                    "\n"
         "  backup.exe backup   <repository-dir> <source-config-file> [-verbose] [-always_hash] [-hard_link_min_bytes=n]"                                                            "\n"
-        "  backup.exe verify   <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-verify_hashes] [-write_file_table]"                                           "\n"
+        "  backup.exe verify   <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-verify_hashes] [-write_file_table]"                                          "\n"
         "  backup.exe recover  <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot]"                                                                               "\n"
         "  backup.exe purge    <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot]"                                                                               "\n"
         "  backup.exe add      <target-snapshot-dir> <source-snapshot-dir> [<source-snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-ignore_path] [-hard_link_min_bytes=n]"   "\n"
@@ -64,13 +64,11 @@ int main(int argc, char** argv)
 
         if (command == "BACKUP")
         {
-            CBackup backup;
-            backup.Backup(paths);
+            CBackup::Run(paths);
         }
         else if (command == "VERIFY")
         {
-            CVerify verify;
-            verify.Verify(paths);
+            CVerify::Run(paths);
         }
         
     }
