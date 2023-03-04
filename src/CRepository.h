@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <memory>
 
 #include "CPath.h"
 #include "CRepoFile.h"
@@ -9,34 +10,31 @@
 class CRepository
 {
 public:
-    void OpenSnapshot(const CPath& snapshotPath);
-    void OpenAllSnapshots(const CPath& repositoryPath);
+    CRepository() = default;
+    CRepository(
+        const CPath&                repositoryPath, 
+        CSnapshot::EOpenMode        openMode = CSnapshot::EOpenMode::READ, 
+        const std::vector<CPath>&   excludes = {});
 
-    void CreateTargetSnapshot(const CPath& repositoryPath);
+    void OpenSnapshot(
+        const CPath&                snapshotPath,
+        CSnapshot::EOpenMode        openMode = CSnapshot::EOpenMode::READ);
 
-    const CPath&    GetTargetSnapshotPath() const;
-    int             GetTargetSnapshotIndex() const;
-    int             GetNewestSourceSnapshotIndex() const;
-    int             GetSnapshotIndexByPath(const CPath& path) const;
+    void OpenAllSnapshots(
+        const CPath&                repositoryPath, 
+        CSnapshot::EOpenMode        openMode = CSnapshot::EOpenMode::READ, 
+        const std::vector<CPath>&   excludes = {});
 
+//    CSnapshot&                      GetSnapshotByPath();
+//    const CSnapshot&                GetSnapshotByPath() const;
+    const std::vector<std::unique_ptr<CSnapshot>>&   GetAllSnapshots() const;
+    std::vector<std::unique_ptr<CSnapshot>>&         GetAllSnapshots();
 
-    // find           by suffix                     in last snapshot                        OFTEN               backup
-    // find           by suffix, hash               in source snapshot                      OFTEN               subtract
-    // find           by         hash               in source snapshot                      OFTEN               subtract
-    // find           by suffix, hash               in target snapshot                      OFTEN               add
-    // find           by         hash               in target snapshot                      OFTEN               add
-    // enum all                                     in ref, source snapshot                 ONCE PER SNAP       verify, recover, purge, add
+    bool FindAndDuplicateFile(CRepoFile& target, CSnapshot& targetSnapshot, bool copyOnLinkFail = true) const;
 
-    CRepoFile               FindRepoFile(const CPath& relativePath, const std::string& hash, int snapshotIdx);
-    std::vector<CRepoFile>  EnumRepoFiles(int snapshotIdx);
-
-    bool Import(const CRepoFile& source);
-    bool Duplicate(const CRepoFile& source);
+public:
+    static std::vector<CPath> GetSnapshotPaths(const CPath repositoryPath, const std::vector<CPath>& excludes = {});
 
 private:
-    bool SearchAndLink(const CRepoFile& target);
-
-    std::vector<CSnapshot>  mSnapshots;
-
-    bool mHasTargetSnapshot = false;
+    std::vector<std::unique_ptr<CSnapshot>>  mSnapshots;
 };

@@ -3,19 +3,21 @@
 #include <vector>
 
 #include "COptions.h"
+#include "CLogger.h"
+#include "CHelpers.h"
 #include "CBackup.h"
 #include "CVerify.h"
-#include "Helpers.h"
+#include "CPurge.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void printUsage()
 {
-    Log("usage:"                                                                                                                                                                    "\n"
+    CLogger::Log("usage:"                                                                                                                                                           "\n"
         "  backup.exe backup   <repository-dir> <source-config-file> [-verbose] [-always_hash] [-hard_link_min_bytes=n]"                                                            "\n"
         "  backup.exe verify   <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-verify_hashes] [-write_file_table]"                                          "\n"
         "  backup.exe recover  <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot]"                                                                               "\n"
-        "  backup.exe purge    <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot]"                                                                               "\n"
+        "  backup.exe purge    <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-rewrite_db]"                                                                 "\n"
         "  backup.exe add      <target-snapshot-dir> <source-snapshot-dir> [<source-snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-ignore_path] [-hard_link_min_bytes=n]"   "\n"
         "  backup.exe subtract <target-snapshot-dir> <source-snapshot-dir> [<source-snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-ignore_path] [-hard_link_min_bytes=n]"   "\n"
     );
@@ -27,33 +29,31 @@ int main(int argc, char** argv)
 {
     try
     {
-        if (argc < 3)
-        {
-            printUsage();
-            return 1;
-        }
-
-        std::string                                         command = ToUpper(argv[1]);
-        std::deque<std::string>                             arguments(argv + 2, argv + argc);
-        std::vector<CPath>    paths;
+        std::string                 command = CHelpers::ToUpper(argv[1]);
+        std::deque<std::string>     arguments(argv + 2, argv + argc);
+        std::vector<CPath>          paths;
 
         while (!arguments.empty())
         {
-            if (ToUpper(arguments.front()) == "-VERBOSE")
+            if (CHelpers::ToUpper(arguments.front()) == "-VERBOSE")
             {
                 COptions::GetSingletonNonConst().verbose = true;
             }
-            else if (ToUpper(arguments.front()) == "-ALWAYS_HASH")
+            else if (CHelpers::ToUpper(arguments.front()) == "-ALWAYS_HASH")
             {
                 COptions::GetSingletonNonConst().alwaysHash = true;
             }
-            else if (ToUpper(arguments.front()) == "-VERIFY_HASHES")
+            else if (CHelpers::ToUpper(arguments.front()) == "-VERIFY_HASHES")
             {
                 COptions::GetSingletonNonConst().verifyHashes = true;
             }
-            else if (ToUpper(arguments.front()) == "-WRITE_FILE_TABLE")
+            else if (CHelpers::ToUpper(arguments.front()) == "-WRITE_FILE_TABLE")
             {
                 COptions::GetSingletonNonConst().writeFileTable = true;
+            }
+            else if (CHelpers::ToUpper(arguments.front()) == "-COMPACT_DB")
+            {
+                COptions::GetSingletonNonConst().compactDB = true;
             }
             else
             {
@@ -64,32 +64,48 @@ int main(int argc, char** argv)
 
         if (command == "BACKUP")
         {
-            CBackup::Run(paths);
+            if (!CBackup::Run(paths))
+            {
+                printUsage();
+                return 1;
+            }
         }
         else if (command == "VERIFY")
         {
-            CVerify::Run(paths);
+            if (!CVerify::Run(paths))
+            {
+                printUsage();
+                return 1;
+            }
         }
-        
+        else if (command == "PURGE")
+        {
+            if (!CPurge::Run(paths))
+            {
+                printUsage();
+                return 1;
+            }
+        }
+
     }
     catch (const char* exception)
     {
-        LogFatal(exception);
+        CLogger::LogFatal(exception);
         return 1;
     }
     catch (const std::string& exception)
     {
-        LogFatal(exception);
+        CLogger::LogFatal(exception);
         return 1;
     }
     catch (const std::exception& exception)
     {
-        LogFatal(exception.what());
+        CLogger::LogFatal(exception.what());
         return 1;
     }
     catch (...)
     {
-        LogFatal("unknown exception");
+        CLogger::LogFatal("unknown exception");
         return 1;
     }
 

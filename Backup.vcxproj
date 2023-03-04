@@ -21,9 +21,12 @@
   <ItemGroup>
     <ClInclude Include="src\CBackup.h" />
     <ClInclude Include="src\CDate.h" />
+    <ClInclude Include="src\CHelpers.h" />
+    <ClInclude Include="src\CLogger.h" />
+    <ClInclude Include="src\CPurge.h" />
     <ClInclude Include="src\CRepoFile.h" />
+    <ClInclude Include="src\CSize.h" />
     <ClInclude Include="src\CVerify.h" />
-    <ClInclude Include="src\Helpers.h" />
     <ClInclude Include="src\COptions.h" />
     <ClInclude Include="src\CPath.h" />
     <ClInclude Include="src\picosha2.h" />
@@ -34,8 +37,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\CBackup.cpp" />
+    <ClCompile Include="src\CDate.cpp" />
+    <ClCompile Include="src\CHelpers.cpp" />
+    <ClCompile Include="src\CLogger.cpp" />
+    <ClCompile Include="src\COptions.cpp" />
+    <ClCompile Include="src\CPath.cpp" />
+    <ClCompile Include="src\CPurge.cpp" />
+    <ClCompile Include="src\CSize.cpp" />
     <ClCompile Include="src\CVerify.cpp" />
-    <ClCompile Include="src\Helpers.cpp" />
     <ClCompile Include="src\Main.cpp" />
     <ClCompile Include="src\CRepoFile.cpp" />
     <ClCompile Include="src\CRepository.cpp" />
@@ -119,6 +128,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -132,6 +142,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -148,6 +159,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -165,6 +177,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <TreatWarningAsError>true</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

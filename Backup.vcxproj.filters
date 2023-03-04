@@ -10,9 +10,6 @@
     <ClInclude Include="src\CBackup.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Helpers.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\picosha2.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -43,12 +40,21 @@
     <ClInclude Include="src\CVerify.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\CPurge.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CSize.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CLogger.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CHelpers.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\CBackup.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Helpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Main.cpp">
@@ -70,6 +76,27 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\CVerify.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CPurge.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CLogger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CPath.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CSize.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CDate.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CHelpers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\COptions.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

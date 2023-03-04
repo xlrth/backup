@@ -7,5 +7,5 @@
 class CVerify
 {
 public:
-    static void Run(const std::vector<CPath>& snapshotPaths);
+    static bool Run(const std::vector<CPath>& paths);
 };

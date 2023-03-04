@@ -5,43 +5,28 @@
 class CDate
 {
 public:
+    static constexpr long long UNSPECIFIED = -1;
+
+public:
     CDate() = default;
     CDate(CDate&&) = default;
     CDate(const CDate&) = default;
 
-    CDate(long long value)
-        :
-        mValue(value)
-    {}
+    CDate(long long value);
+    CDate(std::chrono::system_clock::time_point value);
 
-    CDate(std::chrono::system_clock::time_point value)
-        :
-        mValue(TimePointToLongLong(value))
-    {}
+    bool IsSpecified() const;
 
-    operator std::chrono::system_clock::time_point() const
-    {
-        return LongLongToTimePoint(mValue);
-    }
+    operator std::chrono::system_clock::time_point() const;
+    operator long long() const;
 
-    operator long long() const
-    {
-        return mValue;
-    }
-
+    CDate& operator = (CDate&& other) = default;
     CDate& operator = (const CDate& other) = default;
 
 private: // static
-    static long long TimePointToLongLong(std::chrono::system_clock::time_point timePoint)
-    {
-        return timePoint.time_since_epoch().count();
-    }
-
-    static std::chrono::system_clock::time_point LongLongToTimePoint(long long longLong)
-    {
-        return std::chrono::system_clock::time_point(std::chrono::system_clock::duration(longLong));
-    }
+    static long long TimePointToLongLong(std::chrono::system_clock::time_point timePoint);
+    static std::chrono::system_clock::time_point LongLongToTimePoint(long long longLong);
 
 private:
-    long long mValue = 0;
+    long long mValue = UNSPECIFIED;
 };

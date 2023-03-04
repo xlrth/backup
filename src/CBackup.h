@@ -9,7 +9,7 @@
 class CBackup
 {
 public:
-    static void Run(const std::vector<CPath>& paths);
+    static bool Run(const std::vector<CPath>& paths);
 
 private: // static methods
     static void ReadConfig(
@@ -21,5 +21,7 @@ private: // static methods
         const CPath&                    sourcePath,
         const CPath&                    targetPathRelative,
         const std::vector<std::string>& excludes,
-        CRepository&                    repository);
+        const CRepository&              repository,
+        const CSnapshot*                lastSnapshot,
+        CSnapshot&                      targetSnapshot);
 };

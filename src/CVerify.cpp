@@ -1,21 +1,20 @@
 #include "CVerify.h"
 
-#include <iostream>
+#include <ostream>
 #include <iomanip>
 #include <map>
 
-#include "CPath.h"
 #include "COptions.h"
+#include "CLogger.h"
+#include "CHelpers.h"
+#include "CSnapshot.h"
 #include "CRepository.h"
-#include "CRepoFile.h"
-#include "Helpers.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void CVerify::Run(const std::vector<CPath>& snapshotPaths)
+bool CVerify::Run(const std::vector<CPath>& paths)
 {
-    InitLog("");
-
+    CLogger::Init("");
     COptions::GetSingleton().Log();
 
     struct SFileTableEntry
@@ -26,20 +25,32 @@ void CVerify::Run(const std::vector<CPath>& snapshotPaths)
 
     std::map<unsigned long long, SFileTableEntry> fileTable;
 
+    std::vector<CPath> snapshotPaths = paths;
+    if (snapshotPaths.empty())
+    {
+        snapshotPaths.push_back(".");
+    }
+    if (snapshotPaths.size() == 1 && !CSnapshot::IsValidPath(snapshotPaths.back()))
+    {
+        snapshotPaths = CRepository::GetSnapshotPaths(snapshotPaths.back());
+    }
+
     for (auto& snapshotPath : snapshotPaths)
     {
-        Log("verifying " + snapshotPath.string());
+        CLogger::Log("verifying snapshot " + snapshotPath.string());
 
-        CRepository repository;
-        repository.OpenSnapshot(snapshotPath);
+        CSnapshot snapshot(snapshotPath, CSnapshot::EOpenMode::READ);
 
-        std::vector<CRepoFile> repoFiles = repository.EnumRepoFiles(0);
+        snapshot.DBVerify();
 
+        std::vector<CRepoFile> repoFiles = snapshot.FindAllFiles({});
         for (auto& repoFile : repoFiles)
         {
+            LOG_DEBUG("verifying: " + repoFile.ToString(), EColor::WHITE);
+
             if (!repoFile.IsExisting())
             {
-                LogWarning("missing: " + repoFile.ToString());
+                CLogger::LogError("missing: " + repoFile.ToString());
                 continue;
             }
 
@@ -55,30 +66,37 @@ void CVerify::Run(const std::vector<CPath>& snapshotPaths)
                 {
                     if (fileTableEntry->repoFile.GetHash() != repoFile.GetHash())
                     {
-                        LogError("inconsistent hash: " + repoFile.ToString());
+                        CLogger::LogError("inconsistent hash: " + repoFile.ToString() + " DB: " + repoFile.GetHash() + " repo file: " + fileTableEntry->repoFile.GetHash());
                     }
                     else
                     {
-                        LogDebug("repeating link: " + repoFile.ToString(), COLOR_HASH_SKIP);
+                        LOG_DEBUG("repeating link: " + repoFile.ToString(), COLOR_HASH_SKIP);
                     }
                     continue;
                 }
             }
 
+            if (!repoFile.Open())
+            {
+                CLogger::LogError("file not accessible: " + repoFile.ToString());
+            }
+
             if (COptions::GetSingleton().verifyHashes)
             {
                 std::string storedHash = repoFile.GetHash();
-                LogDebug("hashing: " + repoFile.ToString(), COLOR_HASH);
+                LOG_DEBUG("hashing: " + repoFile.ToString(), COLOR_HASH);
                 if (!repoFile.Hash())
                 {
-                    LogError("cannot hash: " + repoFile.ToString());
+                    CLogger::LogError("file not hashable: " + repoFile.ToString());
                     repoFile.SetHash("");
                 }
                 else if (storedHash != repoFile.GetHash())
                 {
-                    LogError("inconsistent hash: " + repoFile.ToString());
+                    CLogger::LogError("inconsistent hash: " + repoFile.ToString() + " DB: " + storedHash + " repo file: " + repoFile.GetHash());
                 }
             }
+
+            repoFile.Close();
 
             if (fileTableEntry != nullptr)
             {
@@ -86,19 +104,21 @@ void CVerify::Run(const std::vector<CPath>& snapshotPaths)
                 fileTableEntry->hardLinkCount = hardLinkCount;
             }
         }
+
+        CLogger::Log("finished verifying snapshot " + snapshotPath.string());
     }
 
     if (COptions::GetSingleton().writeFileTable)
     {
-        auto fileName = "fileTable_" + CurrentTimeAsString() + ".csv";
+        auto fileName = "fileTable_" + CHelpers::CurrentTimeAsString() + ".csv";
         std::ofstream fileTableFile(fileName);
         if (!fileTableFile.is_open())
         {
-            LogWarning("cannot open " + fileName);
+            CLogger::LogWarning("cannot open " + fileName);
         }
         else
         {
-            Log("writing " + fileName);
+            CLogger::Log("writing " + fileName);
             for (auto& fileTableEntry : fileTable)
             {
                 fileTableFile
@@ -111,6 +131,12 @@ void CVerify::Run(const std::vector<CPath>& snapshotPaths)
         }
     }
 
+    if (snapshotPaths.size() > 1)
+    {
+        CLogger::Log("finished verifying " + std::to_string(snapshotPaths.size()) + " snapshots");
+    }
     CRepoFile::StaticLogStats();
-    CloseLog();
+    CLogger::Close();
+
+    return true;
 }

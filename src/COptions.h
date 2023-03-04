@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Helpers.h"
+#include "CHelpers.h"
 
 class COptions
 {
@@ -11,48 +11,14 @@ public:
     int createNewSnapshot   = 0;
     int verifyHashes        = 0;
     int writeFileTable      = 0;
+    int compactDB           = 0;
     int matchPath           = 0;
 
-    void Log() const
-    {
-        if (verbose)
-        {
-            ::Log("verbose enabled");
-        }
-        if (alwaysHash)
-        {
-            ::Log("always hashing enabled");
-        }
-        if (mHardLinkMinBytes != 512 + 1)
-        {
-            ::Log("min bytes for hard link = " + std::to_string(mHardLinkMinBytes));
-        }
-        if (createNewSnapshot)
-        {
-            ::Log("creating snapshot enabled");
-        }
-        if (verifyHashes)
-        {
-            ::Log("verifying hashes enabled");
-        }
-        if (writeFileTable)
-        {
-            ::Log("writing file table enabled");
-        }
-        if (matchPath)
-        {
-            ::Log("matching paths enabled");
-        }
-    }
+    // would need automatic sync to usage message
+    //bool ParseCmdLineArg(const std::string& cmdLineArg);
 
-    static COptions& GetSingletonNonConst()
-    {
-        static COptions sSingleton;
-        return sSingleton;
-    }
+    void Log() const;
 
-    static const COptions& GetSingleton()
-    {
-        return GetSingletonNonConst();
-    }
+    static COptions& GetSingletonNonConst();
+    static const COptions& GetSingleton();
 };

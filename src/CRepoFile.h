@@ -4,38 +4,39 @@
 #include <memory>
 #include <fstream>
 
-#include "CDate.h"
 #include "CPath.h"
+#include "CSize.h"
+#include "CDate.h"
 
 class CRepoFile
 {
 public:
-    static constexpr long long UNSPECIFIED = -1;
-
-public:
     CRepoFile() = default;
+    CRepoFile(CRepoFile&&) = default;
+    CRepoFile(const CRepoFile&) = default;
+
     CRepoFile(
         CPath           sourcePath          ,
         CPath           parentPath          ,
         CPath           relativePath        ,
-        long long       size                ,
+        CSize           size                ,
         CDate           date                ,
         std::string     hash                );
 
     bool IsExisting() const;    
-    bool IsLinkable() const;
+//    bool IsLinkable() const;
 
     CPath               GetSourcePath() const;
     CPath               GetParentPath() const;
     CPath               GetRelativePath() const;
-    long long           GetSize() const;
+    CSize               GetSize() const;
     CDate               GetDate() const;
     const std::string&  GetHash() const;
 
     void SetSourcePath(const CPath& sourcePath);
     void SetParentPath(const CPath& parentPath);
     void SetRelativePath(const CPath& relativePath);
-    void SetSize(long long size);
+    void SetSize(CSize size);
     void SetDate(CDate date);
     void SetHash(const std::string& hash);
 
@@ -43,6 +44,8 @@ public:
     void CloseSource();
     bool HashSource();
 
+    bool Open();
+    void Close();
     bool Hash();
 
     CPath GetFullPath() const;
@@ -57,6 +60,10 @@ public:
 
     bool GetFileInfo(unsigned long long& fileSystemIndex, int& hardLinkCount) const;
 
+    CRepoFile& operator = (CRepoFile&& other) = default;
+    CRepoFile& operator = (const CRepoFile& other) = default;
+//    bool operator != (const CRepoFile& other) const;
+
 public: // static
     static void StaticLogStats();
 
@@ -64,11 +71,12 @@ private:
     CPath           mSourcePath;
     CPath           mParentPath;
     CPath           mRelativePath;
-    long long       mSize = UNSPECIFIED;
-    CDate           mDate = UNSPECIFIED;
+    CSize           mSize;
+    CDate           mDate;
     std::string     mHash;
 
     std::shared_ptr<std::ifstream>   mSourceFileHandle;
+    std::shared_ptr<std::ifstream>   mFileHandle;
 
 private: // static
     static long long   sFilesHashed;
