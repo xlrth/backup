@@ -43,9 +43,10 @@ void CRepository::CloseSnapshot(const CPath& snapshotPath)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-CSnapshot& CRepository::CreateSnapshot()
+CSnapshot& CRepository::CreateSnapshot(const std::string& suffix)
 {
-    mSnapshots.emplace_back(std::make_unique<CSnapshot>(mRepositoryPath / CHelpers::CurrentTimeAsString(), CSnapshot::EOpenMode::CREATE));
+    std::string snapshotName = CHelpers::CurrentTimeAsString() + (suffix.empty() ? "" : "_" + suffix);
+    mSnapshots.emplace_back(std::make_unique<CSnapshot>(mRepositoryPath / snapshotName, CSnapshot::EOpenMode::CREATE));
     return *mSnapshots.back();
 }
 

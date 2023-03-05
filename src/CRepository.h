@@ -16,7 +16,7 @@ public:
     void OpenSnapshot(const CPath& snapshotPath);
     void CloseSnapshot(const CPath& snapshotPath);
 
-    CSnapshot& CreateSnapshot();
+    CSnapshot& CreateSnapshot(const std::string& suffix = "");
 
     const std::vector<std::unique_ptr<CSnapshot>>&   GetAllSnapshots() const;
     std::vector<std::unique_ptr<CSnapshot>>&         GetAllSnapshots();

@@ -26,7 +26,7 @@ bool CBackup::Run(const std::vector<CPath>& paths)
 
     CRepository repository(repositoryPath);
 
-    CSnapshot& targetSnapshot = repository.CreateSnapshot();
+    CSnapshot& targetSnapshot = repository.CreateSnapshot(COptions::GetSingleton().suffix);
 
     CLogger::Init(targetSnapshot.GetPath());
 
@@ -169,13 +169,6 @@ void CBackup::BackupSingleRecursive(
         targetFile.SetSourcePath(sourcePath);
         targetFile.SetRelativePath(targetPathRelative);
 
-        // lock file to prevent others from modification
-        if (!targetFile.OpenSource())
-        {
-            CLogger::LogError("cannot lock, excluding: " + sourcePath.string());
-            return;
-        }
-
         targetFile.SetSize(std::experimental::filesystem::file_size(sourcePath));
         targetFile.SetDate(std::experimental::filesystem::last_write_time(sourcePath).time_since_epoch().count());
 
@@ -196,6 +189,16 @@ void CBackup::BackupSingleRecursive(
         else
         {
             LOG_DEBUG("hashing: " + targetFile.SourceToString(), COLOR_HASH);
+
+            // lock file to prevent others from modification
+            if (!targetFile.OpenSource())
+            {
+                CLogger::LogError("cannot lock, excluding: " + sourcePath.string());
+                return;
+            }
+            // re-read properties after locking
+            targetFile.SetSize(std::experimental::filesystem::file_size(sourcePath));
+            targetFile.SetDate(std::experimental::filesystem::last_write_time(sourcePath).time_since_epoch().count());
 
             std::string lastHash = targetFile.GetHash();
             if (!targetFile.HashSource())
@@ -219,24 +222,25 @@ void CBackup::BackupSingleRecursive(
                 LOG_DEBUG("skip unchanged: " + targetFile.ToString(), COLOR_DUP_SKIP);
                 return;
             }
-
-            if (targetSnapshot.DuplicateFile(existingFile.GetFullPath(), targetFile))
-            {
-                LOG_DEBUG("duplicated unchanged: " + targetFile.ToString(), COLOR_DUP_UNCHANGED);
-                return;
-            }
         }
-
-        existingFile = repository.FindFile(
-            { {}, {}, {}, {}, {}, targetFile.GetHash() },
-            COptions::GetSingleton().verifyAccessible,
-            true);
+        else
+        {
+            existingFile = repository.FindFile(
+                { {}, {}, {}, {}, {}, targetFile.GetHash() },
+                COptions::GetSingleton().verifyAccessible,
+                true);
+        }
 
         if (!existingFile.GetHash().empty())
         {
             if (targetSnapshot.DuplicateFile(existingFile.GetFullPath(), targetFile))
             {
                 LOG_DEBUG("duplicated by hash: " + targetFile.ToString(), COLOR_DUP);
+                return;
+            }
+            else
+            {
+                CLogger::LogError("cannot duplicate: " + targetFile.ToString());
                 return;
             }
         }

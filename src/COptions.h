@@ -15,6 +15,8 @@ public:
 
     int mHardLinkMinBytes = 512 + 1;
 
+    std::string suffix;
+
     // would need automatic sync to usage message
     //bool ParseCmdLineArg(const std::string& cmdLineArg);
 

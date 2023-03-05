@@ -317,6 +317,20 @@ void CSnapshot::DBInitRead()
 {
     mDb = CSqliteWrapper(mSqliteFile.string().c_str(), true);
     mDb.RunQuery("pragma cache_size = 1000000");
+#if 0 // HACK FOR UPDATE OLD DBS WITH MISSING INDEX
+    if (!mDb.StartQuery("SELECT * FROM sqlite_master where name = \"HASH_idx_ARCHIVE\"").HasData())
+    {
+        mDb.Close();
+        CHelpers::MakeBackup(mSqliteFile);
+        CHelpers::MakeWritable(mSqliteFile);
+        mDb = CSqliteWrapper(mSqliteFile.string().c_str(), false);
+        mDb.RunQuery("create unique index HASH_idx_ARCHIVE on HASH (ARCHIVE, FILE, SIZE, DATE, HASH)");
+        mDb.Close();
+        CHelpers::MakeReadOnly(mSqliteFile);
+        CHelpers::MakeBackup(mSqliteFile);
+        DBInitRead();
+    }
+#endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

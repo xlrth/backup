@@ -15,7 +15,7 @@
 void printUsage()
 {
     CLogger::Log("usage:" "\n"
-        "  backup.exe backup   <repository-dir> <source-config-file> [-verbose] [-always_hash] [-skip_unchanged] [-verify_accessible] [-hard_link_min_bytes=n]" "\n"
+        "  backup.exe backup   <repository-dir> <source-config-file> [-verbose] [-always_hash] [-skip_unchanged] [-verify_accessible] [-suffix=s]" "\n"
         "  backup.exe verify   [<repository-dir>] [<snapshot-dir> ...] [-verbose] [-verify_hashes] [-write_file_table]" "\n"
         "  backup.exe purge    <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-compact_db]" "\n"
         "  backup.exe distill  <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-compact_db] [-verify_accessible]" "\n"
@@ -61,6 +61,10 @@ int main(int argc, char** argv)
             else if (CHelpers::ToUpper(arguments.front()) == "-VERIFY_ACCESSIBLE")
             {
                 COptions::GetSingletonNonConst().verifyAccessible = true;
+            }
+            else if (CHelpers::ToUpper(arguments.front()).substr(0, std::strlen("-SUFFIX=")) == "-SUFFIX=")
+            {
+                COptions::GetSingletonNonConst().suffix = arguments.front().substr(std::strlen("-SUFFIX="));
             }
             else
             {

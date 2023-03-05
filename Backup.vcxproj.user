@@ -6,12 +6,12 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LocalDebuggerCommandArguments>backup TestRepository TestConfig.cfg -skip_unchanged -verbose</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>backup TestRepository TestConfig.cfg -skip_unchanged -verbose -suffix=suffix</LocalDebuggerCommandArguments>
     <LocalDebuggerWorkingDirectory>$(ProjectDir)/test</LocalDebuggerWorkingDirectory>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LocalDebuggerCommandArguments>backup TestRepository TestConfig.cfg -skip_unchanged -verbose</LocalDebuggerCommandArguments>
+    <LocalDebuggerCommandArguments>backup TestRepository TestConfig.cfg -skip_unchanged -verbose -suffix=suffix</LocalDebuggerCommandArguments>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerWorkingDirectory>$(ProjectDir)/test</LocalDebuggerWorkingDirectory>
   </PropertyGroup>

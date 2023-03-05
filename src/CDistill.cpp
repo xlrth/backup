@@ -15,7 +15,7 @@ bool CDistill::Run(const std::vector<CPath>& snapshotPaths)
         return false;
     }
 
-    CRepository repository(snapshotPaths.back().parent_path());
+    CRepository repository(std::experimental::filesystem::absolute(snapshotPaths.back()).parent_path());
 
     for (auto& snapshotPath : snapshotPaths)
     {

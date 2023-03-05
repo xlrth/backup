@@ -5,6 +5,8 @@
 
 #include "CLogger.h"
 
+static std::string TIME_FORMAT = "%Y-%m-%d_%H-%M-%S";
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 std::string CHelpers::NumberAsString(long long number, int minWidth)
@@ -30,7 +32,7 @@ std::string CHelpers::TimeAsString(std::chrono::system_clock::time_point time)
 {
     auto itt = std::chrono::system_clock::to_time_t(time);
     std::ostringstream ss;
-    ss << std::put_time(localtime(&itt), "%Y-%m-%d_%H-%M-%S");
+    ss << std::put_time(localtime(&itt), TIME_FORMAT.c_str());
     return ss.str();
 }
 
@@ -41,8 +43,8 @@ std::chrono::system_clock::time_point CHelpers::StringAsTime(const std::string& 
     struct std::tm tm;
     std::memset(&tm, 0, sizeof(tm));
     std::istringstream iss;
-    iss.str(string);
-    iss >> std::get_time(&tm, "%Y-%m-%d_%H-%M-%S");
+    iss.str(string.substr(0, TIME_FORMAT.length()));
+    iss >> std::get_time(&tm, TIME_FORMAT.c_str());
     time_t timeT = mktime(&tm);
     if (timeT == -1)
     {
