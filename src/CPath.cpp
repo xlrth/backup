@@ -4,11 +4,9 @@
 
 #ifdef _WIN32
 static constexpr long long MAX_PATH_LENGTH = _MAX_FILESYS_NAME;
-static constexpr long long MAX_HARD_LINK_COUNT = 1023;
 #else
 #   include <linux/limits.h>
 static constexpr long long MAX_PATH_LENGTH = PATH_MAX
-static constexpr long long MAX_HARD_LINK_COUNT = TODO: DEFINE FOR NON - WINDOWS;
 #endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

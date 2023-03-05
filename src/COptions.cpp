@@ -12,9 +12,9 @@ void COptions::Log() const
     {
         CLogger::Log("always hashing enabled");
     }
-    if (mHardLinkMinBytes != 512 + 1)
+    if (skipUnchanged)
     {
-        CLogger::Log("min bytes for hard link = " + std::to_string(mHardLinkMinBytes));
+        CLogger::Log("skip unchanged enabled");
     }
     if (verifyHashes)
     {
@@ -31,6 +31,10 @@ void COptions::Log() const
     if (verifyAccessible)
     {
         CLogger::Log("verify accessible enabled");
+    }
+    if (mHardLinkMinBytes != 512 + 1)
+    {
+        CLogger::Log("min bytes for hard link = " + std::to_string(mHardLinkMinBytes));
     }
 }
 

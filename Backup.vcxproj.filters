@@ -7,46 +7,47 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\CBackup.h">
+    <None Include="README.md" />
+    <None Include="TODO.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\sqlite3.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="src\picosha2.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\sqlite3.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\CSqliteWrapper.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\CSnapshot.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\COptions.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\CRepository.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\CPath.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\CDate.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\CRepoFile.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\CVerify.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\CSize.h">
+    <ClInclude Include="src\CHelpers.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="src\CLogger.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\CHelpers.h">
+    <ClInclude Include="src\COptions.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CPath.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CRepoFile.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CRepository.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CSize.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CSnapshot.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CSqliteWrapper.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CBackup.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="src\CDistill.h">
@@ -55,39 +56,12 @@
     <ClInclude Include="src\CPurge.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="src\CVerify.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\CBackup.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\CSqliteWrapper.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\sqlite3.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\CSnapshot.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\CRepository.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\CRepoFile.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\CVerify.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\CLogger.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\CPath.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\CSize.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\CDate.cpp">
@@ -96,7 +70,28 @@
     <ClCompile Include="src\CHelpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\CLogger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\COptions.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CPath.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CRepoFile.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CRepository.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CSize.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CSnapshot.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CSqliteWrapper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\CDistill.cpp">
@@ -105,9 +100,14 @@
     <ClCompile Include="src\CPurge.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="README.md" />
-    <None Include="TODO.md" />
+    <ClCompile Include="src\CVerify.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CBackup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

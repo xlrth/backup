@@ -7,6 +7,7 @@ class COptions
 public:
     bool verbose            = false;
     bool alwaysHash         = false;
+    bool skipUnchanged      = false;
     bool verifyHashes       = false;
     bool writeFileTable     = false;
     bool compactDB          = false;

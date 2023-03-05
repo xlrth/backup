@@ -163,15 +163,26 @@ void CSnapshot::Close()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-CRepoFile CSnapshot::FindFirstFile(const CRepoFile& constraints) const
+CRepoFile CSnapshot::FindFile(const CRepoFile& constraints, bool verifyAccessible, bool preferLinkable) const
 {
+    CRepoFile unlinkableFile;
+
     auto iterator = DBSelect(constraints);
-    if (iterator.HasFile())
+    while (iterator.HasFile())
     {
-        return iterator.GetNextFile();
+        CRepoFile file = iterator.GetNextFile();
+        if (verifyAccessible && !file.Open())
+        {
+            continue;
+        }
+        if (!preferLinkable || file.IsLinkable())
+        {
+            return file;
+        }
+        unlinkableFile = file;
     }
 
-    return {};
+    return unlinkableFile;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -213,7 +224,7 @@ bool CSnapshot::ImportFile(const CPath& source, CRepoFile& target)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-bool CSnapshot::DuplicateFile(const CPath& source, CRepoFile& target, bool copyOnLinkFail)
+bool CSnapshot::DuplicateFile(const CPath& source, CRepoFile& target)
 {
     VERIFY(!target.GetSourcePath().empty());
     VERIFY(!target.GetRelativePath().empty());
@@ -223,12 +234,9 @@ bool CSnapshot::DuplicateFile(const CPath& source, CRepoFile& target, bool copyO
 
     target.SetParentPath(GetPath());
 
-    if (!target.Link(source))
+    if (!target.Link(source) && !target.Copy(source))
     {
-        if (!copyOnLinkFail || !target.Copy(source))
-        {
-            return false;
-        }
+        return false;
     }
 
     DBInsert(target);

@@ -59,7 +59,7 @@ bool CVerify::Run(const std::vector<CPath>& paths)
 
             SFileTableEntry* fileTableEntry = nullptr;
 
-            if (repoFile.GetFileInfo(fileSystemIndex, hardLinkCount))
+            if (repoFile.ReadFileInfo(fileSystemIndex, hardLinkCount))
             {
                 fileTableEntry = &fileTable[fileSystemIndex];
                 if (!fileTableEntry->repoFile.GetHash().empty())

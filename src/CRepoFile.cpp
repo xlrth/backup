@@ -15,6 +15,15 @@
 #   include <io.h> 
 #endif
 
+#ifdef _WIN32
+static constexpr long long MAX_HARD_LINK_COUNT = 1023;
+#else
+#   include <linux/limits.h>
+#error TODO: DEFINE MAX_HARD_LINK_COUNT FOR NON-WINDOWS
+static constexpr long long MAX_HARD_LINK_COUNT = 
+#endif
+
+
 long long CRepoFile::sFilesHashed   = 0;
 long long CRepoFile::sFilesLinked   = 0;
 long long CRepoFile::sFilesCopied   = 0;
@@ -131,29 +140,28 @@ void CRepoFile::SetHash(const std::string& hash)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 bool CRepoFile::IsExisting() const
 {
-    CPath fullPath = GetFullPath();
-    return std::experimental::filesystem::exists(fullPath);
+    return std::experimental::filesystem::exists(GetFullPath());
 }
 
-#if 0
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 bool CRepoFile::IsLinkable() const
 {
-    CPath fullPath = GetFullPath();
-    if (!std::experimental::filesystem::exists(fullPath))
+    std::error_code errorCode;
+    auto hardLinkCount = std::experimental::filesystem::hard_link_count(GetFullPath(), errorCode);
+    if (errorCode)
     {
-        LogWarning("stored file missing: " + ToString());
+        CLogger::LogWarning("cannot get hard link count: " + ToString(), errorCode);
         return false;
     }
-    if (std::experimental::filesystem::hard_link_count(fullPath) == MAX_HARD_LINK_COUNT)
+
+    if (hardLinkCount >= MAX_HARD_LINK_COUNT)
     {
-        LogWarning("stored file reached hard link count limit: " + ToString());
         return false;
     }
+
     return true;
 }
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -404,7 +412,7 @@ bool CRepoFile::Delete()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-bool CRepoFile::GetFileInfo(unsigned long long& fileSystemIndex, int& hardLinkCount) const
+bool CRepoFile::ReadFileInfo(unsigned long long& fileSystemIndex, int& hardLinkCount) const
 {
     fileSystemIndex = 0;
     hardLinkCount = 0;

@@ -35,16 +35,20 @@ bool CDistill::Run(const std::vector<CPath>& snapshotPaths)
         std::vector<CRepoFile> repoFiles = snapshot.FindAllFiles({});
         for (auto& repoFile : repoFiles)
         {
-            if (repository.FindFile(repoFile, COptions::GetSingleton().verifyAccessible))
-            {
-                if (!snapshot.DeleteFile(repoFile))
-                {
-                    CLogger::LogError("cannot delete: " + repoFile.ToString());
-                }
-            }
-            else
+            CRepoFile existingFile = repository.FindFile(
+                { {}, {}, {}, {}, {}, repoFile.GetHash() },
+                COptions::GetSingleton().verifyAccessible,
+                false);
+                
+            if (existingFile.GetHash().empty())
             {
                 CLogger::Log("distilled: " + repoFile.ToString(), COLOR_DISTILL);
+                continue;
+            }
+            
+            if (!snapshot.DeleteFile(repoFile))
+            {
+                CLogger::LogError("cannot delete: " + repoFile.ToString());
             }
         }
 

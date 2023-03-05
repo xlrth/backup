@@ -24,7 +24,7 @@ public:
         std::string     hash                );
 
     bool IsExisting() const;    
-//    bool IsLinkable() const;
+    bool IsLinkable() const;
 
     CPath               GetSourcePath() const;
     CPath               GetParentPath() const;
@@ -59,7 +59,7 @@ public:
 
     bool Delete();
 
-    bool GetFileInfo(unsigned long long& fileSystemIndex, int& hardLinkCount) const;
+    bool ReadFileInfo(unsigned long long& fileSystemIndex, int& hardLinkCount) const;
 
     CRepoFile& operator = (CRepoFile&& other) = default;
     CRepoFile& operator = (const CRepoFile& other) = default;

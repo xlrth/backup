@@ -22,6 +22,5 @@ private: // static methods
         const CPath&                    targetPathRelative,
         const std::vector<std::string>& excludes,
         const CRepository&              repository,
-        const CSnapshot*                lastSnapshot,
         CSnapshot&                      targetSnapshot);
 };

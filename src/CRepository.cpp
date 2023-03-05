@@ -77,55 +77,24 @@ void CRepository::ReorderSnapshotsByDistance(const CPath& centerSnapshotPath)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-bool CRepository::FindFile(const CRepoFile& repoFile, bool verifyAccessible) const
+CRepoFile CRepository::FindFile(const CRepoFile& constraints, bool verifyAccessible, bool preferLinkable) const
 {
+    CRepoFile unlinkableFile;
     for (int i = (int)mSnapshots.size() - 1; i >= 0; i--)
     {
-        auto iterator = mSnapshots[i]->DBSelect({ {}, {}, {}, {}, {}, repoFile.GetHash() });
-        while (iterator.HasFile())
+        CRepoFile file = mSnapshots[i]->FindFile(constraints, verifyAccessible, preferLinkable);
+        if (file.GetHash().empty())
         {
-            auto found = iterator.GetNextFile();
-            VERIFY(found.GetSize() == repoFile.GetSize());
-
-            if (!verifyAccessible || found.Open())
-            {
-                return true;
-            }
+            continue;
         }
+        if (!preferLinkable || file.IsLinkable())
+        {
+            return file;
+        }
+        unlinkableFile = file;
     }
 
-    return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-bool CRepository::FindAndDuplicateFile(CRepoFile& target, CSnapshot& targetSnapshot, bool copyOnLinkFail) const
-{
-    CRepoFile found;
-    for (int i = (int)mSnapshots.size() - 1; i >= 0; i--)
-    {
-        auto iterator = mSnapshots[i]->DBSelect({ {}, {}, {}, {}, {}, target.GetHash() });
-        while (iterator.HasFile())
-        {
-            found = iterator.GetNextFile();
-            VERIFY(found.GetSize() == target.GetSize());
-
-            if (targetSnapshot.DuplicateFile(found.GetFullPath(), target))
-            {
-                return true;
-            }
-        }
-    }
-
-    if (copyOnLinkFail && !found.GetHash().empty())
-    {
-        if (targetSnapshot.DuplicateFile(found.GetFullPath(), target, true))
-        {
-            return true;
-        }
-    }
-
-    return false;
+    return unlinkableFile;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

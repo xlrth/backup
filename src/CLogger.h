@@ -39,8 +39,9 @@ static constexpr EColor COLOR_DELETE                = EColor::DARK_MAGENTA;
 static constexpr EColor COLOR_HASH                  = EColor::MAGENTA;
 static constexpr EColor COLOR_HASH_SKIP             = EColor::DARK_GRAY;
 
-static constexpr EColor COLOR_DUP_LAST              = EColor::DARK_GRAY;
-static constexpr EColor COLOR_DUP_HASH              = EColor::DARK_CYAN;
+static constexpr EColor COLOR_DUP                   = EColor::DARK_MAGENTA;
+static constexpr EColor COLOR_DUP_UNCHANGED         = EColor::DARK_CYAN;
+static constexpr EColor COLOR_DUP_SKIP              = EColor::DARK_GRAY;
 
 static constexpr EColor COLOR_IMPORT                = EColor::GREEN;
 static constexpr EColor COLOR_EXCLUDE               = EColor::BLUE;

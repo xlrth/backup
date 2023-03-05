@@ -15,9 +15,8 @@
 void printUsage()
 {
     CLogger::Log("usage:" "\n"
-        "  backup.exe backup   <repository-dir> <source-config-file> [-verbose] [-always_hash] [-hard_link_min_bytes=n]" "\n"
+        "  backup.exe backup   <repository-dir> <source-config-file> [-verbose] [-always_hash] [-skip_unchanged] [-verify_accessible] [-hard_link_min_bytes=n]" "\n"
         "  backup.exe verify   [<repository-dir>] [<snapshot-dir> ...] [-verbose] [-verify_hashes] [-write_file_table]" "\n"
-        "  backup.exe recover  <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-hard_link_min_bytes=n]" "\n"
         "  backup.exe purge    <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-compact_db]" "\n"
         "  backup.exe distill  <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-compact_db] [-verify_accessible]" "\n"
     );
@@ -42,6 +41,10 @@ int main(int argc, char** argv)
             else if (CHelpers::ToUpper(arguments.front()) == "-ALWAYS_HASH")
             {
                 COptions::GetSingletonNonConst().alwaysHash = true;
+            }
+            else if (CHelpers::ToUpper(arguments.front()) == "-SKIP_UNCHANGED")
+            {
+                COptions::GetSingletonNonConst().skipUnchanged = true;
             }
             else if (CHelpers::ToUpper(arguments.front()) == "-VERIFY_HASHES")
             {

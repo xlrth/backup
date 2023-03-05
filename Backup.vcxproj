@@ -19,44 +19,44 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <None Include="README.md" />
+    <None Include="TODO.md" />
+  </ItemGroup>
+  <ItemGroup>
     <ClInclude Include="src\CBackup.h" />
     <ClInclude Include="src\CDate.h" />
+    <ClInclude Include="src\CDistill.h" />
     <ClInclude Include="src\CHelpers.h" />
     <ClInclude Include="src\CLogger.h" />
-    <ClInclude Include="src\CPurge.h" />
-    <ClInclude Include="src\CRepoFile.h" />
-    <ClInclude Include="src\CSize.h" />
-    <ClInclude Include="src\CDistill.h" />
-    <ClInclude Include="src\CVerify.h" />
     <ClInclude Include="src\COptions.h" />
     <ClInclude Include="src\CPath.h" />
-    <ClInclude Include="src\picosha2.h" />
+    <ClInclude Include="src\CPurge.h" />
+    <ClInclude Include="src\CRepoFile.h" />
     <ClInclude Include="src\CRepository.h" />
+    <ClInclude Include="src\CSize.h" />
     <ClInclude Include="src\CSnapshot.h" />
-    <ClInclude Include="src\sqlite3.h" />
     <ClInclude Include="src\CSqliteWrapper.h" />
+    <ClInclude Include="src\CVerify.h" />
+    <ClInclude Include="src\picosha2.h" />
+    <ClInclude Include="src\sqlite3.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\CBackup.cpp" />
     <ClCompile Include="src\CDate.cpp" />
+    <ClCompile Include="src\CDistill.cpp" />
     <ClCompile Include="src\CHelpers.cpp" />
     <ClCompile Include="src\CLogger.cpp" />
     <ClCompile Include="src\COptions.cpp" />
     <ClCompile Include="src\CPath.cpp" />
     <ClCompile Include="src\CPurge.cpp" />
-    <ClCompile Include="src\CSize.cpp" />
-    <ClCompile Include="src\CDistill.cpp" />
-    <ClCompile Include="src\CVerify.cpp" />
-    <ClCompile Include="src\Main.cpp" />
     <ClCompile Include="src\CRepoFile.cpp" />
     <ClCompile Include="src\CRepository.cpp" />
+    <ClCompile Include="src\CSize.cpp" />
     <ClCompile Include="src\CSnapshot.cpp" />
-    <ClCompile Include="src\sqlite3.c" />
     <ClCompile Include="src\CSqliteWrapper.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="README.md" />
-    <None Include="TODO.md" />
+    <ClCompile Include="src\CVerify.cpp" />
+    <ClCompile Include="src\Main.cpp" />
+    <ClCompile Include="src\sqlite3.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>

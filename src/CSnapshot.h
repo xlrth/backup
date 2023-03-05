@@ -40,18 +40,11 @@ public: // methods
     void Open(const CPath& path, EOpenMode openMode);
     void Close();
 
-    // find           by suffix                     in last snapshot                        OFTEN               backup
-// find           by suffix, hash               in source snapshot                      OFTEN               subtract
-// find           by         hash               in source snapshot                      OFTEN               subtract
-// find           by suffix, hash               in target snapshot                      OFTEN               add
-// find           by         hash               in target snapshot                      OFTEN               add
-// enum all                                     in ref, source snapshot                 ONCE PER SNAP       verify, recover, purge, add
-
-    CRepoFile               FindFirstFile(const CRepoFile& constraints) const;
+    CRepoFile               FindFile(const CRepoFile& constraints, bool verifyAccessible, bool preferLinkable) const;
     std::vector<CRepoFile>  FindAllFiles(const CRepoFile& constraints) const;
 
     bool ImportFile(const CPath& source, CRepoFile& target);
-    bool DuplicateFile(const CPath& source, CRepoFile& target, bool copyOnLinkFail = false);
+    bool DuplicateFile(const CPath& source, CRepoFile& target);
     bool DeleteFile(CRepoFile& repoFile);
 
     CIterator DBSelect(const CRepoFile& constraints) const;
@@ -61,7 +54,6 @@ public: // methods
     void DBCompact();
 
 private:
-
     void DBInitRead();
     void DBInitWrite();
     void DBInitCreate();

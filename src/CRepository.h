@@ -23,8 +23,7 @@ public:
 
     void ReorderSnapshotsByDistance(const CPath& centerSnapshotPath);
 
-    bool FindFile(const CRepoFile& repoFile, bool verifyAccessible = true) const;
-    bool FindAndDuplicateFile(CRepoFile& target, CSnapshot& targetSnapshot, bool copyOnLinkFail = true) const;
+    CRepoFile FindFile(const CRepoFile& constraints, bool verifyAccessible, bool preferLinkable) const;
 
 public: // static
     static std::vector<CPath> GetSnapshotPaths(const CPath repositoryPath);

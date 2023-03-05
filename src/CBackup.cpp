@@ -26,11 +26,6 @@ bool CBackup::Run(const std::vector<CPath>& paths)
 
     CRepository repository(repositoryPath);
 
-    const CSnapshot* lastSnapshot = nullptr;
-    if (!repository.GetAllSnapshots().empty())
-    {
-        lastSnapshot = &*repository.GetAllSnapshots().back();
-    }
     CSnapshot& targetSnapshot = repository.CreateSnapshot();
 
     CLogger::Init(targetSnapshot.GetPath());
@@ -72,7 +67,7 @@ bool CBackup::Run(const std::vector<CPath>& paths)
             CLogger::LogWarning("destination already exists, adding suffix and trying again: " + destSuffix.string());
         }
 
-        BackupSingleRecursive(sourceMod, destSuffix, excludes, repository, lastSnapshot, targetSnapshot);
+        BackupSingleRecursive(sourceMod, destSuffix, excludes, repository, targetSnapshot);
     }
 
     CLogger::Log("finished backing up to snapshot " + targetSnapshot.GetPath().string());
@@ -141,7 +136,6 @@ void CBackup::BackupSingleRecursive(
         const CPath&                    targetPathRelative,
         const std::vector<std::string>& excludes,
         const CRepository&              repository,
-        const CSnapshot*                lastSnapshot,
         CSnapshot&                      targetSnapshot)
 {
     std::string sourceStrUpper = CHelpers::ToUpper(sourcePath.string());
@@ -165,76 +159,93 @@ void CBackup::BackupSingleRecursive(
     {
         for (auto& entry : std::experimental::filesystem::directory_iterator(sourcePath))
         {
-            BackupSingleRecursive(entry.path(), targetPathRelative / CPath(entry.path().filename()), excludes, repository, lastSnapshot, targetSnapshot);
+            BackupSingleRecursive(entry.path(), targetPathRelative / CPath(entry.path().filename()), excludes, repository, targetSnapshot);
         }
     }
     else
     {
-        CRepoFile repoFile;
+        CRepoFile targetFile;
 
-        repoFile.SetSourcePath(sourcePath);
-        repoFile.SetRelativePath(targetPathRelative);
+        targetFile.SetSourcePath(sourcePath);
+        targetFile.SetRelativePath(targetPathRelative);
 
         // lock file to prevent others from modification
-        if (!repoFile.OpenSource())
+        if (!targetFile.OpenSource())
         {
             CLogger::LogError("cannot lock, excluding: " + sourcePath.string());
             return;
         }
 
-        repoFile.SetSize(std::experimental::filesystem::file_size(sourcePath));
-        repoFile.SetDate(std::experimental::filesystem::last_write_time(sourcePath).time_since_epoch().count());
+        targetFile.SetSize(std::experimental::filesystem::file_size(sourcePath));
+        targetFile.SetDate(std::experimental::filesystem::last_write_time(sourcePath).time_since_epoch().count());
 
-        CRepoFile lastBackup;
-        if (lastSnapshot != nullptr)
+        CRepoFile existingFile = repository.FindFile(
+                { {}, {}, targetFile.GetRelativePath(), targetFile.GetSize(), targetFile.GetDate(), {} },
+                COptions::GetSingleton().verifyAccessible,
+                false);
+
+        if (!existingFile.GetHash().empty())
         {
-            lastBackup = lastSnapshot->FindFirstFile({ {}, {}, targetPathRelative, repoFile.GetSize(), repoFile.GetDate(), {} });
+            targetFile.SetHash(existingFile.GetHash());
         }
 
-        if (!lastBackup.GetHash().empty())
+        if (!targetFile.GetHash().empty() && !COptions::GetSingleton().alwaysHash)
         {
-            repoFile.SetHash(lastBackup.GetHash());
-        }
-
-        if (!repoFile.GetHash().empty() && !COptions::GetSingleton().alwaysHash)
-        {
-            LOG_DEBUG("skipping hashing: " + repoFile.SourceToString(), COLOR_HASH_SKIP);
+            LOG_DEBUG("skipping hashing: " + targetFile.SourceToString(), COLOR_HASH_SKIP);
         }
         else
         {
-            LOG_DEBUG("hashing: " + repoFile.SourceToString(), COLOR_HASH);
+            LOG_DEBUG("hashing: " + targetFile.SourceToString(), COLOR_HASH);
 
-            std::string lastHash = repoFile.GetHash();
-            if (!repoFile.HashSource())
+            std::string lastHash = targetFile.GetHash();
+            if (!targetFile.HashSource())
             {
-                CLogger::LogError("cannot hash, excluding: " + repoFile.SourceToString());
+                CLogger::LogError("cannot hash, excluding: " + targetFile.SourceToString());
+                return;
+            }
+            VERIFY(!targetFile.GetHash().empty());
+
+            if (!lastHash.empty() && lastHash != targetFile.GetHash())
+            {
+                CLogger::LogWarning("supposedly unchanged file with hash mismatch versus last: " + targetFile.SourceToString());
+                existingFile = {};
+            }
+        }
+
+        if (!existingFile.GetHash().empty())
+        {
+            if (COptions::GetSingleton().skipUnchanged)
+            {
+                LOG_DEBUG("skip unchanged: " + targetFile.ToString(), COLOR_DUP_SKIP);
                 return;
             }
 
-            if (!lastHash.empty() && lastHash != repoFile.GetHash())
+            if (targetSnapshot.DuplicateFile(existingFile.GetFullPath(), targetFile))
             {
-                CLogger::LogWarning("supposedly unchanged file with hash mismatch versus last: " + repoFile.SourceToString());
-                lastBackup = CRepoFile{};
+                LOG_DEBUG("duplicated unchanged: " + targetFile.ToString(), COLOR_DUP_UNCHANGED);
+                return;
             }
         }
 
-        if (!lastBackup.GetHash().empty() && targetSnapshot.DuplicateFile(lastBackup.GetFullPath(), repoFile))
+        existingFile = repository.FindFile(
+            { {}, {}, {}, {}, {}, targetFile.GetHash() },
+            COptions::GetSingleton().verifyAccessible,
+            true);
+
+        if (!existingFile.GetHash().empty())
         {
-            LOG_DEBUG("duplicated last backup: " + repoFile.ToString(), COLOR_DUP_LAST);
-            return;
+            if (targetSnapshot.DuplicateFile(existingFile.GetFullPath(), targetFile))
+            {
+                LOG_DEBUG("duplicated by hash: " + targetFile.ToString(), COLOR_DUP);
+                return;
+            }
         }
 
-        if (repository.FindAndDuplicateFile(repoFile, targetSnapshot))
-        {
-            LOG_DEBUG("duplicated by hash: " + repoFile.ToString(), COLOR_DUP_HASH);
-            return;
-        }
+        CLogger::Log("importing: " + targetFile.SourceToString(), COLOR_IMPORT);
 
-        CLogger::Log("importing: " + repoFile.SourceToString(), COLOR_IMPORT);
-
-        if (!targetSnapshot.ImportFile(sourcePath, repoFile))
+        if (!targetSnapshot.ImportFile(sourcePath, targetFile))
         {
-            CLogger::LogError("cannot import new, excluding: " + repoFile.SourceToString());
+            CLogger::LogError("cannot import, excluding: " + targetFile.SourceToString());
         }
     }
 }
