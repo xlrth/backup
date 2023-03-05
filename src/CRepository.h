@@ -11,30 +11,27 @@ class CRepository
 {
 public:
     CRepository() = default;
-    CRepository(
-        const CPath&                repositoryPath, 
-        CSnapshot::EOpenMode        openMode = CSnapshot::EOpenMode::READ, 
-        const std::vector<CPath>&   excludes = {});
+    CRepository(const CPath& repositoryPath);
 
-    void OpenSnapshot(
-        const CPath&                snapshotPath,
-        CSnapshot::EOpenMode        openMode = CSnapshot::EOpenMode::READ);
+    void OpenSnapshot(const CPath& snapshotPath);
+    void CloseSnapshot(const CPath& snapshotPath);
 
-    void OpenAllSnapshots(
-        const CPath&                repositoryPath, 
-        CSnapshot::EOpenMode        openMode = CSnapshot::EOpenMode::READ, 
-        const std::vector<CPath>&   excludes = {});
+    CSnapshot& CreateSnapshot();
 
-//    CSnapshot&                      GetSnapshotByPath();
-//    const CSnapshot&                GetSnapshotByPath() const;
     const std::vector<std::unique_ptr<CSnapshot>>&   GetAllSnapshots() const;
     std::vector<std::unique_ptr<CSnapshot>>&         GetAllSnapshots();
 
+    void ReorderSnapshotsByDistance(const CPath& centerSnapshotPath);
+
+    bool FindFile(const CRepoFile& repoFile, bool verifyAccessible = true) const;
     bool FindAndDuplicateFile(CRepoFile& target, CSnapshot& targetSnapshot, bool copyOnLinkFail = true) const;
 
-public:
-    static std::vector<CPath> GetSnapshotPaths(const CPath repositoryPath, const std::vector<CPath>& excludes = {});
+public: // static
+    static std::vector<CPath> GetSnapshotPaths(const CPath repositoryPath);
 
 private:
-    std::vector<std::unique_ptr<CSnapshot>>  mSnapshots;
+    static std::chrono::system_clock::time_point    SnapshotPathAsTime(const CPath& snapshotPath);
+
+    CPath                                       mRepositoryPath;
+    std::vector<std::unique_ptr<CSnapshot>>     mSnapshots;
 };

@@ -6,34 +6,47 @@
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-CRepository::CRepository(
-    const CPath&                repositoryPath,
-    CSnapshot::EOpenMode        openMode,
-    const std::vector<CPath>&   excludes)
+CRepository::CRepository(const CPath& repositoryPath)
+    : mRepositoryPath(repositoryPath)
 {
-    OpenAllSnapshots(repositoryPath, openMode, excludes);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-void CRepository::OpenSnapshot(
-    const CPath&                snapshotPath,
-    CSnapshot::EOpenMode        openMode)
-{
-    mSnapshots.emplace_back(std::make_unique<CSnapshot>(snapshotPath, openMode));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-void CRepository::OpenAllSnapshots(
-    const CPath&                repositoryPath,
-    CSnapshot::EOpenMode        openMode,
-    const std::vector<CPath>&   excludes)
-{
-    for (auto& s : GetSnapshotPaths(repositoryPath, excludes))
+    for (auto& snapshotPath : GetSnapshotPaths(repositoryPath))
     {
-        OpenSnapshot(s, openMode);
+        mSnapshots.emplace_back(std::make_unique<CSnapshot>(snapshotPath, CSnapshot::EOpenMode::READ));
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void CRepository::OpenSnapshot(const CPath& snapshotPath)
+{
+    for (auto& snapshot : mSnapshots)
+    {
+        VERIFY(!std::experimental::filesystem::equivalent(snapshot->GetPath(), snapshotPath));
+    }
+    mSnapshots.emplace_back(std::make_unique<CSnapshot>(snapshotPath, CSnapshot::EOpenMode::READ));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void CRepository::CloseSnapshot(const CPath& snapshotPath)
+{
+    for (auto it = mSnapshots.begin(); it != mSnapshots.end(); it++)
+    {
+        if (std::experimental::filesystem::equivalent((*it)->GetPath(), snapshotPath))
+        {
+            mSnapshots.erase(it);
+            return;
+        }
+    }
+    throw "cannot close snapshot, path not found: " + snapshotPath.string();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+CSnapshot& CRepository::CreateSnapshot()
+{
+    mSnapshots.emplace_back(std::make_unique<CSnapshot>(mRepositoryPath / CHelpers::CurrentTimeAsString(), CSnapshot::EOpenMode::CREATE));
+    return *mSnapshots.back();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,6 +61,40 @@ const std::vector<std::unique_ptr<CSnapshot>>& CRepository::GetAllSnapshots() co
 std::vector<std::unique_ptr<CSnapshot>>& CRepository::GetAllSnapshots()
 {
     return mSnapshots;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void CRepository::ReorderSnapshotsByDistance(const CPath& centerSnapshotPath)
+{
+    auto centerSnapshotTime = SnapshotPathAsTime(centerSnapshotPath);
+    std::sort(mSnapshots.begin(), mSnapshots.end(), [centerSnapshotTime](const auto& s1, const auto& s2)
+    {
+        return std::abs((SnapshotPathAsTime(s1->GetPath()) - centerSnapshotTime).count())
+            >  std::abs((SnapshotPathAsTime(s2->GetPath()) - centerSnapshotTime).count());
+    });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool CRepository::FindFile(const CRepoFile& repoFile, bool verifyAccessible) const
+{
+    for (int i = (int)mSnapshots.size() - 1; i >= 0; i--)
+    {
+        auto iterator = mSnapshots[i]->DBSelect({ {}, {}, {}, {}, {}, repoFile.GetHash() });
+        while (iterator.HasFile())
+        {
+            auto found = iterator.GetNextFile();
+            VERIFY(found.GetSize() == repoFile.GetSize());
+
+            if (!verifyAccessible || found.Open())
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -83,10 +130,9 @@ bool CRepository::FindAndDuplicateFile(CRepoFile& target, CSnapshot& targetSnaps
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-std::vector<CPath> CRepository::GetSnapshotPaths(const CPath repositoryPath, const std::vector<CPath>& excludes)
+std::vector<CPath> CRepository::GetSnapshotPaths(const CPath repositoryPath)
 {
-    if (!std::experimental::filesystem::exists(repositoryPath)
-        || !std::experimental::filesystem::is_directory(repositoryPath))
+    if (!std::experimental::filesystem::is_directory(repositoryPath))
     {
         throw "repository path invalid: " + repositoryPath.string();
     }
@@ -95,28 +141,24 @@ std::vector<CPath> CRepository::GetSnapshotPaths(const CPath repositoryPath, con
     std::set<CPath> snapshotPaths;
     for (auto& p : std::experimental::filesystem::directory_iterator(repositoryPath))
     {
-        if (!std::experimental::filesystem::is_directory(p))
+        if (!CSnapshot::IsValidPath(p.path()))
         {
             continue;
         }
-        bool skip = false;
-        for (auto& exclude : excludes)
+        if (SnapshotPathAsTime(p.path()) == std::chrono::system_clock::time_point{} || SnapshotPathAsTime(p.path()) > std::chrono::system_clock::now())
         {
-            if (std::experimental::filesystem::equivalent(p.path(), exclude))
-            {
-                skip = true;
-                break;
-            }
+            throw "snapshot directory name malformed: " + p.path().string();
         }
-        if (skip)
-        {
-            continue;
-        }
-        if (CSnapshot::IsValidPath(p.path()))
-        {
-            snapshotPaths.insert(p.path());
-        }
+
+        snapshotPaths.insert(p.path());
     }
 
     return std::vector<CPath>(snapshotPaths.begin(), snapshotPaths.end());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+std::chrono::system_clock::time_point CRepository::SnapshotPathAsTime(const CPath& snapshotPath)
+{
+    return CHelpers::StringAsTime(snapshotPath.filename().string());
 }

@@ -26,6 +26,7 @@
     <ClInclude Include="src\CPurge.h" />
     <ClInclude Include="src\CRepoFile.h" />
     <ClInclude Include="src\CSize.h" />
+    <ClInclude Include="src\CDistill.h" />
     <ClInclude Include="src\CVerify.h" />
     <ClInclude Include="src\COptions.h" />
     <ClInclude Include="src\CPath.h" />
@@ -44,6 +45,7 @@
     <ClCompile Include="src\CPath.cpp" />
     <ClCompile Include="src\CPurge.cpp" />
     <ClCompile Include="src\CSize.cpp" />
+    <ClCompile Include="src\CDistill.cpp" />
     <ClCompile Include="src\CVerify.cpp" />
     <ClCompile Include="src\Main.cpp" />
     <ClCompile Include="src\CRepoFile.cpp" />

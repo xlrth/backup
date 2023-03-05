@@ -86,7 +86,7 @@ void CSnapshot::Open(const CPath& path, EOpenMode openMode)
 
     if (std::experimental::filesystem::exists(mPath / "IN_PROGRESS"))
     {
-        throw "snapshot " + mPath.string() + " is incomplete";
+        throw "snapshot is incomplete: " + mPath.string();
     }
 
     mSqliteFile = mPath / "hash.sqlite";
@@ -95,7 +95,7 @@ void CSnapshot::Open(const CPath& path, EOpenMode openMode)
     {
         if (!std::experimental::filesystem::exists(mSqliteFile))
         {
-            throw "snapshot " + mPath.string() + " does not have a sqlite file";
+            throw "snapshot invalid, sqlite file missing: " + mPath.string();
         }
 
         DBInitRead();
@@ -104,7 +104,7 @@ void CSnapshot::Open(const CPath& path, EOpenMode openMode)
     {
         if (!std::experimental::filesystem::exists(mSqliteFile))
         {
-            throw "snapshot " + mPath.string() + " does not have a sqlite file";
+            throw "snapshot invalid, sqlite file missing: " + mPath.string();
         }
         mLockFilePath = mPath / "IN_PROGRESS";
         mLockFileHandle.open(mLockFilePath.string());
@@ -122,7 +122,7 @@ void CSnapshot::Open(const CPath& path, EOpenMode openMode)
     {
         if (std::experimental::filesystem::exists(mPath))
         {
-            throw "snapshot " + mPath.string() + " already existing";
+            throw "snapshot already existing: " + mPath.string();
         }
         if (!std::experimental::filesystem::create_directory(mPath))
         {
@@ -207,6 +207,7 @@ bool CSnapshot::ImportFile(const CPath& source, CRepoFile& target)
     }
     
     DBInsert(target);
+
     return true;
 }
 
@@ -231,6 +232,21 @@ bool CSnapshot::DuplicateFile(const CPath& source, CRepoFile& target, bool copyO
     }
 
     DBInsert(target);
+
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool CSnapshot::DeleteFile(CRepoFile& repoFile)
+{
+    if (!repoFile.Delete())
+    {
+        return false;
+    }
+
+    DBDelete(repoFile);
+
     return true;
 }
 
@@ -263,7 +279,14 @@ void CSnapshot::DBInsert(const CRepoFile& file)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CSnapshot::CSnapshot::DBDelete(const CRepoFile& constraints)
 {
-    mDb.RunQuery("delete from HASH " + DBFormatConstraints(constraints));
+    // HACK FOR OLD DBs date format: 
+    CRepoFile constraintsMod = constraints;
+    constraintsMod.SetDate(CDate::UNSPECIFIED);
+    // TODO: ALSO ADD MISSING ASSERT IN SQLITEWRAPPER
+    // TODO: ALSO REMOVE BACKUP BEFORE WRITING?? 
+    // TODO: BACKWARD COMPATIBILITY SWITCH??? --> WOLFGANG FRAGEN!
+
+    mDb.RunQuery("delete from HASH " + DBFormatConstraints(constraintsMod));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -307,7 +330,6 @@ void CSnapshot::DBInitCreate()
 
     mDb = CSqliteWrapper(mSqliteFile.string().c_str(), false);
     mDb.RunQuery("pragma cache_size = 1000000");
-    mDb.RunQuery("pragma page_size = 4096");
     mDb.RunQuery("pragma synchronous = off");
     mDb.RunQuery("pragma secure_delete = off");
     mDb.RunQuery("pragma journal_mode = off");

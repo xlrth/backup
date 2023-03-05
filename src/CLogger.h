@@ -24,7 +24,7 @@ enum class EColor
     YELLOW,
     WHITE,
 
-    INVERSE_RED = int(RED) * 256,
+    INVERSE_RED = int(RED) * 16,
 };
 
 static constexpr EColor COLOR_WARNING               = EColor::YELLOW;
@@ -32,20 +32,20 @@ static constexpr EColor COLOR_ERROR                 = EColor::RED;
 static constexpr EColor COLOR_FATAL                 = EColor::INVERSE_RED;
 
 static constexpr EColor COLOR_COPY                  = EColor::DARK_GREEN;
-static constexpr EColor COLOR_COPY_SMALL            = EColor::LIGHT_GRAY;
+static constexpr EColor COLOR_COPY_SMALL            = EColor::DARK_GRAY;
 static constexpr EColor COLOR_LINK                  = EColor::CYAN;
+static constexpr EColor COLOR_DELETE                = EColor::DARK_MAGENTA;
 
 static constexpr EColor COLOR_HASH                  = EColor::MAGENTA;
-static constexpr EColor COLOR_HASH_SKIP             = EColor::LIGHT_GRAY;
+static constexpr EColor COLOR_HASH_SKIP             = EColor::DARK_GRAY;
 
-static constexpr EColor COLOR_DUP_LAST              = EColor::LIGHT_GRAY;
+static constexpr EColor COLOR_DUP_LAST              = EColor::DARK_GRAY;
 static constexpr EColor COLOR_DUP_HASH              = EColor::DARK_CYAN;
 
 static constexpr EColor COLOR_IMPORT                = EColor::GREEN;
-static constexpr EColor COLOR_EXCLUDE               = EColor::DARK_GRAY;
-static constexpr EColor COLOR_PURGE                 = EColor::CYAN;
-static constexpr EColor COLOR_SUBTRACT              = EColor::MAGENTA;
-static constexpr EColor COLOR_ADD                   = EColor::BLUE;
+static constexpr EColor COLOR_EXCLUDE               = EColor::BLUE;
+static constexpr EColor COLOR_PURGE                 = EColor::MAGENTA;
+static constexpr EColor COLOR_DISTILL               = EColor::CYAN;
 
 
 

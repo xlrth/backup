@@ -55,8 +55,9 @@ public:
     std::string ToCSV() const;
 
     bool Copy(const CPath& source) const;
-
     bool Link(const CPath& source) const;
+
+    bool Delete();
 
     bool GetFileInfo(unsigned long long& fileSystemIndex, int& hardLinkCount) const;
 
@@ -82,8 +83,10 @@ private: // static
     static long long   sFilesHashed;
     static long long   sFilesCopied;
     static long long   sFilesLinked;
+    static long long   sFilesDeleted;
 
     static long long   sBytesHashed;
     static long long   sBytesCopied;
     static long long   sBytesLinked;
+    static long long   sBytesDeleted;
 };

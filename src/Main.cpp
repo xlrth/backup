@@ -8,18 +8,18 @@
 #include "CBackup.h"
 #include "CVerify.h"
 #include "CPurge.h"
+#include "CDistill.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void printUsage()
 {
-    CLogger::Log("usage:"                                                                                                                                                           "\n"
-        "  backup.exe backup   <repository-dir> <source-config-file> [-verbose] [-always_hash] [-hard_link_min_bytes=n]"                                                            "\n"
-        "  backup.exe verify   <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-verify_hashes] [-write_file_table]"                                          "\n"
-        "  backup.exe recover  <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot]"                                                                               "\n"
-        "  backup.exe purge    <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-rewrite_db]"                                                                 "\n"
-        "  backup.exe add      <target-snapshot-dir> <source-snapshot-dir> [<source-snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-ignore_path] [-hard_link_min_bytes=n]"   "\n"
-        "  backup.exe subtract <target-snapshot-dir> <source-snapshot-dir> [<source-snapshot-dir> ...] [-verbose] [-create_new_snapshot] [-ignore_path] [-hard_link_min_bytes=n]"   "\n"
+    CLogger::Log("usage:" "\n"
+        "  backup.exe backup   <repository-dir> <source-config-file> [-verbose] [-always_hash] [-hard_link_min_bytes=n]" "\n"
+        "  backup.exe verify   [<repository-dir>] [<snapshot-dir> ...] [-verbose] [-verify_hashes] [-write_file_table]" "\n"
+        "  backup.exe recover  <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-hard_link_min_bytes=n]" "\n"
+        "  backup.exe purge    <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-compact_db]" "\n"
+        "  backup.exe distill  <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-compact_db] [-verify_accessible]" "\n"
     );
 }
 
@@ -55,6 +55,10 @@ int main(int argc, char** argv)
             {
                 COptions::GetSingletonNonConst().compactDB = true;
             }
+            else if (CHelpers::ToUpper(arguments.front()) == "-VERIFY_ACCESSIBLE")
+            {
+                COptions::GetSingletonNonConst().verifyAccessible = true;
+            }
             else
             {
                 paths.push_back(arguments.front());
@@ -81,6 +85,14 @@ int main(int argc, char** argv)
         else if (command == "PURGE")
         {
             if (!CPurge::Run(paths))
+            {
+                printUsage();
+                return 1;
+            }
+        }
+        else if (command == "DISTILL")
+        {
+            if (!CDistill::Run(paths))
             {
                 printUsage();
                 return 1;

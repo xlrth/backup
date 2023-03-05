@@ -16,10 +16,6 @@ void COptions::Log() const
     {
         CLogger::Log("min bytes for hard link = " + std::to_string(mHardLinkMinBytes));
     }
-    if (createNewSnapshot)
-    {
-        CLogger::Log("create new snapshot enabled");
-    }
     if (verifyHashes)
     {
         CLogger::Log("verify hashes enabled");
@@ -32,9 +28,9 @@ void COptions::Log() const
     {
         CLogger::Log("compact db enabled");
     }
-    if (matchPath)
+    if (verifyAccessible)
     {
-        CLogger::Log("match paths enabled");
+        CLogger::Log("verify accessible enabled");
     }
 }
 

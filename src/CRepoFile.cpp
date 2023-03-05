@@ -15,13 +15,15 @@
 #   include <io.h> 
 #endif
 
-long long CRepoFile::sFilesHashed = 0;
-long long CRepoFile::sFilesLinked = 0;
-long long CRepoFile::sFilesCopied = 0;
+long long CRepoFile::sFilesHashed   = 0;
+long long CRepoFile::sFilesLinked   = 0;
+long long CRepoFile::sFilesCopied   = 0;
+long long CRepoFile::sFilesDeleted  = 0;
 
-long long CRepoFile::sBytesHashed = 0;
-long long CRepoFile::sBytesLinked = 0;
-long long CRepoFile::sBytesCopied = 0;
+long long CRepoFile::sBytesHashed   = 0;
+long long CRepoFile::sBytesLinked   = 0;
+long long CRepoFile::sBytesCopied   = 0;
+long long CRepoFile::sBytesDeleted  = 0;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -316,8 +318,6 @@ bool CRepoFile::Copy(const CPath& source) const
 
     LOG_DEBUG("copied: " + ToString() + " from: " + source.string(), GetSize() < COptions::GetSingleton().mHardLinkMinBytes ? COLOR_COPY_SMALL : COLOR_COPY);
 
-    CHelpers::MakeReadOnly(GetFullPath());
-
 #ifndef _WIN32 // fixes modification date not being copied under linux
     auto lastWriteTime = std::experimental::filesystem::last_write_time(source, errorCode);
     if (errorCode)
@@ -379,6 +379,31 @@ bool CRepoFile::Link(const CPath& source) const
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+bool CRepoFile::Delete()
+{
+    Close();
+
+    CHelpers::MakeWritable(GetFullPath());
+
+    std::error_code errorCode;
+
+    std::experimental::filesystem::remove(GetFullPath(), errorCode);
+    if (errorCode)
+    {
+        CLogger::LogWarning("cannot delete: " + ToString(), errorCode);
+        return false;
+    }
+
+    sFilesDeleted++;
+    sBytesDeleted += GetSize();
+
+    LOG_DEBUG("deleted: " + ToString(), COLOR_DELETE);
+
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 bool CRepoFile::GetFileInfo(unsigned long long& fileSystemIndex, int& hardLinkCount) const
 {
     fileSystemIndex = 0;
@@ -418,7 +443,17 @@ bool CRepoFile::GetFileInfo(unsigned long long& fileSystemIndex, int& hardLinkCo
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CRepoFile::StaticLogStats()
 {
-    CLogger::Log("hashed: " + CHelpers::NumberAsString(sFilesHashed, 15) + " files " + CHelpers::NumberAsString(sBytesHashed, 19) + " bytes");
-    CLogger::Log("copied: " + CHelpers::NumberAsString(sFilesCopied, 15) + " files " + CHelpers::NumberAsString(sBytesCopied, 19) + " bytes");
-    CLogger::Log("linked: " + CHelpers::NumberAsString(sFilesLinked, 15) + " files " + CHelpers::NumberAsString(sBytesLinked, 19) + " bytes");
+    CLogger::Log("hashed:  " + CHelpers::NumberAsString(sFilesHashed, 15)   + " files " + CHelpers::NumberAsString(sBytesHashed, 19)    + " bytes");
+    CLogger::Log("copied:  " + CHelpers::NumberAsString(sFilesCopied, 15)   + " files " + CHelpers::NumberAsString(sBytesCopied, 19)    + " bytes");
+    CLogger::Log("linked:  " + CHelpers::NumberAsString(sFilesLinked, 15)   + " files " + CHelpers::NumberAsString(sBytesLinked, 19)    + " bytes");
+    CLogger::Log("deleted: " + CHelpers::NumberAsString(sFilesDeleted, 15)  + " files " + CHelpers::NumberAsString(sBytesDeleted, 19)   + " bytes");
+
+    sFilesHashed  = 0;
+    sFilesCopied  = 0;
+    sFilesLinked  = 0;
+    sFilesDeleted = 0;
+    sBytesHashed  = 0;
+    sBytesCopied  = 0;
+    sBytesLinked  = 0;
+    sBytesDeleted = 0;
 }

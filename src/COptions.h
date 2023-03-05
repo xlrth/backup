@@ -7,12 +7,12 @@ class COptions
 public:
     bool verbose            = false;
     bool alwaysHash         = false;
-    int mHardLinkMinBytes   = 512 + 1;
-    int createNewSnapshot   = 0;
-    int verifyHashes        = 0;
-    int writeFileTable      = 0;
-    int compactDB           = 0;
-    int matchPath           = 0;
+    bool verifyHashes       = false;
+    bool writeFileTable     = false;
+    bool compactDB          = false;
+    bool verifyAccessible   = false;
+
+    int mHardLinkMinBytes = 512 + 1;
 
     // would need automatic sync to usage message
     //bool ParseCmdLineArg(const std::string& cmdLineArg);

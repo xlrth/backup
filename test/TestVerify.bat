@@ -1,2 +1,4 @@
-..\x64\Release\Backup.exe verify TestRepository/2023-02-27_22-47-46 -verbose -verify_hashes -write_file_table
+pushd %~dp0
+..\x64\Release\Backup.exe verify %1 -verbose -verify_hashes -write_file_table
+popd
 pause

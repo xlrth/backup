@@ -1,18 +1,21 @@
-#include "CPurge.h"
+#include "CDistill.h"
 
 #include "COptions.h"
 #include "CLogger.h"
 #include "CHelpers.h"
 #include "CSnapshot.h"
+#include "CRepository.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-bool CPurge::Run(const std::vector<CPath>& snapshotPaths)
+bool CDistill::Run(const std::vector<CPath>& snapshotPaths)
 {
     if (snapshotPaths.empty())
     {
         return false;
     }
+
+    CRepository repository(snapshotPaths.back().parent_path());
 
     for (auto& snapshotPath : snapshotPaths)
     {
@@ -20,24 +23,33 @@ bool CPurge::Run(const std::vector<CPath>& snapshotPaths)
         {
             throw "snapshot path invalid: " + snapshotPath.string();
         }
+        repository.CloseSnapshot(snapshotPath);
+        repository.ReorderSnapshotsByDistance(snapshotPath);
 
         CLogger::Init(snapshotPath);
-        CLogger::Log("purging snapshot " + snapshotPath.string());
+        CLogger::Log("distilling snapshot " + snapshotPath.string());
         COptions::GetSingleton().Log();
 
         CSnapshot snapshot(snapshotPath, CSnapshot::EOpenMode::WRITE);
 
         std::vector<CRepoFile> repoFiles = snapshot.FindAllFiles({});
-
         for (auto& repoFile : repoFiles)
         {
-            if (!repoFile.IsExisting())
+            if (repository.FindFile(repoFile, COptions::GetSingleton().verifyAccessible))
             {
-                CLogger::Log("purging: " + repoFile.ToString(), COLOR_PURGE);
-
-                snapshot.DBDelete(repoFile);
+                if (!snapshot.DeleteFile(repoFile))
+                {
+                    CLogger::LogError("cannot delete: " + repoFile.ToString());
+                }
+            }
+            else
+            {
+                CLogger::Log("distilled: " + repoFile.ToString(), COLOR_DISTILL);
             }
         }
+
+        CLogger::Log("deleting empty directories");
+        CHelpers::DeleteEmptyDirectories(snapshotPath);
 
         if (COptions::GetSingleton().compactDB)
         {
@@ -45,14 +57,17 @@ bool CPurge::Run(const std::vector<CPath>& snapshotPaths)
             snapshot.DBCompact();
         }
 
-        CLogger::Log("finished purging snapshot " + snapshotPath.string());
+        CLogger::Log("finished distilling snapshot " + snapshotPath.string());
         CRepoFile::StaticLogStats();
         CLogger::Close();
+
+        snapshot.Close();
+        repository.OpenSnapshot(snapshotPath);
     }
 
     if (snapshotPaths.size() > 1)
     {
-        CLogger::Log("finished purging " + std::to_string(snapshotPaths.size()) + " snapshots");
+        CLogger::Log("finished distilling " + std::to_string(snapshotPaths.size()) + " snapshots");
         CLogger::LogTotalEventCount();
     }
 

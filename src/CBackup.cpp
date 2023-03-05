@@ -25,13 +25,13 @@ bool CBackup::Run(const std::vector<CPath>& paths)
     }
 
     CRepository repository(repositoryPath);
+
     const CSnapshot* lastSnapshot = nullptr;
     if (!repository.GetAllSnapshots().empty())
     {
         lastSnapshot = &*repository.GetAllSnapshots().back();
     }
-    repository.OpenSnapshot(repositoryPath / CHelpers::CurrentTimeAsString(), CSnapshot::EOpenMode::CREATE);
-    CSnapshot& targetSnapshot = *repository.GetAllSnapshots().back();
+    CSnapshot& targetSnapshot = repository.CreateSnapshot();
 
     CLogger::Init(targetSnapshot.GetPath());
 

@@ -36,6 +36,23 @@ std::string CHelpers::TimeAsString(std::chrono::system_clock::time_point time)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+std::chrono::system_clock::time_point CHelpers::StringAsTime(const std::string& string)
+{
+    struct std::tm tm;
+    std::memset(&tm, 0, sizeof(tm));
+    std::istringstream iss;
+    iss.str(string);
+    iss >> std::get_time(&tm, "%Y-%m-%d_%H-%M-%S");
+    time_t timeT = mktime(&tm);
+    if (timeT == -1)
+    {
+        return {};
+    }
+    return std::chrono::system_clock::from_time_t(timeT);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 std::string CHelpers::CurrentTimeAsString()
 {
     return TimeAsString(std::chrono::system_clock::now());
@@ -63,7 +80,7 @@ bool CHelpers::MakeReadOnly(const CPath& file)
 {
     std::error_code errorCode;
     std::experimental::filesystem::permissions(file,
-          std::experimental::filesystem::perms::remove_perms
+        std::experimental::filesystem::perms::remove_perms
         | std::experimental::filesystem::perms::owner_write
         | std::experimental::filesystem::perms::group_write
         | std::experimental::filesystem::perms::others_write,
@@ -88,7 +105,7 @@ bool CHelpers::MakeWritable(const CPath& file)
         errorCode);
     if (errorCode)
     {
-//        CLogger::LogWarning("cannot make writable: " + file.string(), errorCode);
+        //        CLogger::LogWarning("cannot make writable: " + file.string(), errorCode);
     }
     return !errorCode;
 }
@@ -103,7 +120,7 @@ void CHelpers::MakeBackup(const CPath& file)
     }
 
     CPath backupPath = file.parent_path() / (file.stem().string() + "_" + TimeAsString(std::experimental::filesystem::last_write_time(file)) + file.extension().string());
-    
+
     if (!std::experimental::filesystem::exists(backupPath))
     {
         std::error_code errorCode;
@@ -118,5 +135,29 @@ void CHelpers::MakeBackup(const CPath& file)
         || std::experimental::filesystem::last_write_time(backupPath) != std::experimental::filesystem::last_write_time(file))
     {
         throw "backup " + backupPath.string() + " seems invalid";
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void CHelpers::DeleteEmptyDirectories(const CPath& dir)
+{
+    if (!std::experimental::filesystem::is_directory(dir))
+    {
+        return;
+    }
+
+    for (auto& p : std::experimental::filesystem::directory_iterator(dir))
+    {
+        DeleteEmptyDirectories(p.path());
+    }
+
+    if (std::experimental::filesystem::is_empty(dir))
+    {
+        std::error_code errorCode;
+        if (!std::experimental::filesystem::remove(dir, errorCode))
+        {
+            CLogger::LogWarning("cannot delete directory: " + dir.string(), errorCode);
+        }
     }
 }

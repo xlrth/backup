@@ -54,15 +54,8 @@ CPath::CPath(const char* s)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 CPath& CPath::operator /= (const CPath & other)
 {
-    if (native().size() + other.native().size() + 1 >= MAX_PATH_LENGTH)
-    {
-        CLogger::LogWarning("path is too long, truncating: " + string() + "/" + other.string());
-        std::experimental::filesystem::path::operator /= (other.native().substr(0, MAX_PATH_LENGTH - native().size() - 2));
-    }
-    else
-    {
-        std::experimental::filesystem::path::operator /= (other);
-    }
+    std::experimental::filesystem::path::operator /= (other);
+    FixLongPath();
     return *this;
 }
 
@@ -70,10 +63,11 @@ CPath& CPath::operator /= (const CPath & other)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CPath::FixLongPath()
 {
-    if (native().size() >= MAX_PATH_LENGTH)
+    int absoluteLength = static_cast<int>(std::experimental::filesystem::absolute(*this).native().size());
+    if (absoluteLength >= MAX_PATH_LENGTH)
     {
         CLogger::LogWarning("path is too long, truncating: " + string());
-        *this = std::experimental::filesystem::path(native().substr(0, MAX_PATH_LENGTH - 1));
+        *this = std::experimental::filesystem::path(native().substr(0, MAX_PATH_LENGTH - 1 - absoluteLength + native().size()));
     }
 }
 

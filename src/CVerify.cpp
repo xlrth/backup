@@ -28,7 +28,7 @@ bool CVerify::Run(const std::vector<CPath>& paths)
     std::vector<CPath> snapshotPaths = paths;
     if (snapshotPaths.empty())
     {
-        snapshotPaths.push_back(".");
+        snapshotPaths.push_back(std::experimental::filesystem::current_path());
     }
     if (snapshotPaths.size() == 1 && !CSnapshot::IsValidPath(snapshotPaths.back()))
     {

@@ -52,6 +52,7 @@ public: // methods
 
     bool ImportFile(const CPath& source, CRepoFile& target);
     bool DuplicateFile(const CPath& source, CRepoFile& target, bool copyOnLinkFail = false);
+    bool DeleteFile(CRepoFile& repoFile);
 
     CIterator DBSelect(const CRepoFile& constraints) const;
     void DBInsert(const CRepoFile& repoFile);
@@ -67,9 +68,9 @@ private:
 
     static std::string DBFormatConstraints(const CRepoFile& constraints);
 
-    CPath                   mPath;
-    CPath                   mSqliteFile;
-    mutable CSqliteWrapper  mDb;
-    CPath                   mLockFilePath;
-    std::ofstream           mLockFileHandle;
+    CPath                                   mPath;
+    CPath                                   mSqliteFile;
+    mutable CSqliteWrapper                  mDb;
+    CPath                                   mLockFilePath;
+    std::ofstream                           mLockFileHandle;
 };
