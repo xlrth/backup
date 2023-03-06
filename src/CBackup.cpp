@@ -235,7 +235,7 @@ void CBackup::BackupSingleRecursive(
         {
             if (targetSnapshot.DuplicateFile(existingFile.GetFullPath(), targetFile))
             {
-                LOG_DEBUG("duplicated by hash: " + targetFile.ToString(), COLOR_DUP);
+                LOG_DEBUG("duplicated: " + targetFile.ToString(), COLOR_DUP);
                 return;
             }
             else
