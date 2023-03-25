@@ -307,19 +307,11 @@ bool CRepoFile::Copy(const CPath& source) const
         LOG_DEBUG("copied: " + ToString() + " from: " + source.string(), COLOR_COPY);
     }
 
-#ifndef _WIN32 // fixes modification time not being copied under linux
-    auto lastWriteTime = std::filesystem::last_write_time(source, errorCode);
+#ifndef _WIN32 // fixes modification time not being copied by linux
+    std::filesystem::last_write_time(GetFullPath(), mTime, errorCode);
     if (errorCode)
     {
-        CLogger::GetInstance().LogWarning("cannot read modification time from " + source.string(), errorCode);
-    }
-    else
-    {
-        std::filesystem::last_write_time(GetFullPath(), lastWriteTime, errorCode);
-        if (errorCode)
-        {
-            CLogger::GetInstance().LogWarning("cannot set modification time of " + ToString(), errorCode);
-        }
+        CLogger::GetInstance().LogWarning("cannot set modification time of " + ToString(), errorCode);
     }
 #endif
 

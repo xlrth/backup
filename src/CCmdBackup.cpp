@@ -160,7 +160,7 @@ bool CCmdBackup::Run(const std::vector<CPath>& paths, const COptions& options)
     CLogger::GetInstance().EnableDebugLog(mOptions.GetBool("verbose"));
 
     ReadConfig(configPath);
-    PrepareSources();
+    PrepareSources(repositoryPath);
 
     mRepository.Open(repositoryPath, true);
 
@@ -245,13 +245,15 @@ void CCmdBackup::ReadConfig(const CPath& configPath)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void CCmdBackup::PrepareSources()
+void CCmdBackup::PrepareSources(const CPath& repositoryPath)
 {
+    // check for empty sources
     if (mSources.empty())
     {
         CLogger::GetInstance().LogWarning("no sources specified, snapshot will be empty");
     }
 #ifdef _WIN32
+    // check for ambiguous windows paths
     for (auto& source : mSources)
     {
         if (source.native().size() >= 2 && source.native().substr(1, 1) == L":" && source.native().substr(2, 1) != L"\\")
@@ -261,8 +263,13 @@ void CCmdBackup::PrepareSources()
         }
     }
 #endif
+    // check for source validity
     for (auto& source : mSources)
     {
+        if (IsBlacklisted(source))
+        {
+            throw "source is blacklisted: " + source.string();
+        }
         if (std::filesystem::is_symlink(source))
         {
             throw "source is a symbolic link: " + source.string();
@@ -272,29 +279,51 @@ void CCmdBackup::PrepareSources()
             throw "source does not exist: " + source.string();
         }
     }
+    // normalize source paths
     for (auto& source : mSources)
     {
         if (source.is_absolute())
         {
             source = std::filesystem::canonical(source);
-            LOG_DEBUG("canonical source: " + source.string(), COLOR_DEBUG);
         }
+        else
+        {
+            source = std::filesystem::relative(std::filesystem::canonical(source));
+        }
+        LOG_DEBUG("canonical source: " + source.string(), COLOR_DEBUG);
     }
+    // check for overlapping sources
     for (auto& source1 : mSources)
     {
-        CPath source1Canonical = std::filesystem::canonical(source1);
         for (auto& source2 : mSources)
         {
             if (&source1 == &source2)
             {
                 continue;
             }
-            CPath source2Canonical = std::filesystem::canonical(source2);
-            if (source1Canonical.native().length() <= source2Canonical.native().length() 
-                && std::mismatch(source1Canonical.native().begin(), source1Canonical.native().end(), source2Canonical.native().begin())
-                .first == source1Canonical.native().end())
+            if (Helpers::IsPrefixOfPath(std::filesystem::canonical(source1), std::filesystem::canonical(source2)))
             {
                 throw "a source is equal to or part of another: " + source1.string() + " and " + source2.string();
+            }
+        }
+    }
+    // check for sources being equal to or part of the repository
+    for (auto& source : mSources)
+    {
+        if (Helpers::IsPrefixOfPath(std::filesystem::weakly_canonical(repositoryPath), std::filesystem::canonical(source)))
+        {
+            throw "a source is equal to or part of the repository: " + source.string();
+        }
+    }
+    // check for sources containing the repository
+    for (auto& source : mSources)
+    {
+        if (Helpers::IsPrefixOfPath(std::filesystem::canonical(source), std::filesystem::weakly_canonical(repositoryPath)))
+        {
+            auto repoPathSourceRelative = source / std::filesystem::relative(std::filesystem::weakly_canonical(repositoryPath), source);
+            if (!IsBlacklisted(repoPathSourceRelative))
+            {
+                throw "a source is containing the repository: " + source.string();
             }
         }
     }
@@ -302,15 +331,21 @@ void CCmdBackup::PrepareSources()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-CPath CCmdBackup::FormatTargetPath(CPath& sourcePath)
+CPath CCmdBackup::FormatTargetPath(const CPath& sourcePath)
 {
     std::wstring targetStr = sourcePath.wstring();
 
 #ifdef _WIN32
     std::replace(targetStr.begin(), targetStr.end(), L':', L'#');
-    std::replace(targetStr.begin(), targetStr.end(), L'\\', L'#');
-#endif
+    std::replace(targetStr.begin(), targetStr.end(), L'\\', L'/');
+#else
     std::replace(targetStr.begin(), targetStr.end(), L'/', L'#');
+#endif
+
+    if (targetStr == L".")
+    {
+        targetStr[0] = L'#';
+    }
 
     CPath targetPathRelative = targetStr;
 
@@ -334,18 +369,28 @@ CPath CCmdBackup::FormatTargetPath(CPath& sourcePath)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void CCmdBackup::BackupEntryRecursive(const CPath& sourcePath, const CPath& targetPathRelative)
+bool CCmdBackup::IsBlacklisted(const CPath& sourcePath)
 {
     for (const auto& exclude : mExcludes)
     {
-        if (exclude.native().length() <= sourcePath.native().length() 
-            && std::mismatch(exclude.native().rbegin(), exclude.native().rend(), sourcePath.native().rbegin())
-            .first == exclude.native().rend())
+        if (Helpers::IsSuffixOfPath(exclude, sourcePath))
         {
-            CLogger::GetInstance().Log("excluding (blacklisted):   " + sourcePath.string(), COLOR_EXCLUDE);
-            mExcludeCountBlacklisted++;
-            return;
+            return true;
         }
+    }
+
+    return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void CCmdBackup::BackupEntryRecursive(const CPath& sourcePath, const CPath& targetPathRelative)
+{
+    if (IsBlacklisted(sourcePath))
+    {
+        CLogger::GetInstance().Log("excluding (blacklisted):   " + sourcePath.string(), COLOR_EXCLUDE);
+        mExcludeCountBlacklisted++;
+        return;
     }
 
     if (std::filesystem::is_symlink(sourcePath))

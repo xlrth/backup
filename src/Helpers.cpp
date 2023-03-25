@@ -87,6 +87,17 @@ std::chrono::system_clock::time_point Helpers::FileTimeToSystemTime(std::chrono:
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+std::chrono::file_clock::time_point Helpers::SystemTimeToFileTime(std::chrono::system_clock::time_point systemTime)
+{
+#ifdef _WIN32
+    return std::chrono::clock_cast<std::chrono::file_clock>(systemTime);
+#else
+    return std::chrono::file_clock::from_sys(systemTime);
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 bool Helpers::MakeReadOnly(const CPath& file)
 {
     std::error_code errorCode;
@@ -145,6 +156,21 @@ void Helpers::MakeBackup(const CPath& file)
         {
             throw "cannot create backup " + backupPath.string() + ": " + errorCode.message();
         }
+#ifndef _WIN32 // fixes modification time not being copied by linux
+        auto lastWriteTime = std::filesystem::last_write_time(file, errorCode);
+        if (errorCode)
+        {
+            throw "cannot read modification time from " + file.string() + ": " + errorCode.message();
+        }
+        else
+        {
+            std::filesystem::last_write_time(backupPath, lastWriteTime, errorCode);
+            if (errorCode)
+            {
+                throw "cannot set modification time of " + backupPath.string() + ": " + errorCode.message();
+            }
+        }
+#endif
     }
 
     if (!std::filesystem::exists(backupPath)
@@ -177,6 +203,24 @@ void Helpers::DeleteEmptyDirectories(const CPath& dir)
             CLogger::GetInstance().LogWarning("cannot delete directory: " + dir.string(), errorCode);
         }
     }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool Helpers::IsPrefixOfPath(const CPath& prefix, const CPath& path)
+{
+    return prefix.native().length() <= path.native().length()
+        && std::mismatch(prefix.native().begin(), prefix.native().end(), path.native().begin())
+        .first == prefix.native().end();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool Helpers::IsSuffixOfPath(const CPath& suffix, const CPath& path)
+{
+    return (suffix.native().length() <= path.native().length()
+        && std::mismatch(suffix.native().rbegin(), suffix.native().rend(), path.native().rbegin())
+        .first == suffix.native().rend());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

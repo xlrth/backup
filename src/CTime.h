@@ -19,14 +19,15 @@ public:
     bool IsSpecified() const;
 
     operator std::chrono::system_clock::time_point() const;
+    operator std::chrono::file_clock::time_point() const;
     operator long long() const;
 
     CTime& operator = (CTime&& other) = default;
     CTime& operator = (const CTime& other) = default;
 
 private: // static
-    static long long                                TimePointToLongLong(std::chrono::system_clock::time_point timePoint);
-    static std::chrono::system_clock::time_point    LongLongToTimePoint(long long longLong);
+    static long long                                SystemTimePointToLongLong(std::chrono::system_clock::time_point timePoint);
+    static std::chrono::system_clock::time_point    LongLongToSystemTimePoint(long long longLong);
 
 private:
     long long mValue = UNSPECIFIED;

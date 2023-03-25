@@ -18,8 +18,9 @@ private:
     void PrintHelp();
 
     void    ReadConfig(const CPath& configPath);
-    void    PrepareSources();
-    CPath   FormatTargetPath(CPath& sourcePath);
+    void    PrepareSources(const CPath& repositoryPath);
+    CPath   FormatTargetPath(const CPath& sourcePath);
+    bool    IsBlacklisted(const CPath& sourcePath);
 
     void BackupEntryRecursive(const CPath& sourcePath, const CPath& targetPathRelative);
     void BackupFile(const CPath& sourcePath, const CPath& targetPathRelative);
