@@ -2,6 +2,7 @@
 
 #include <string>
 #include <chrono>
+#include <functional>
 
 #include "CPath.h"
 
@@ -22,4 +23,7 @@ namespace Helpers
     void MakeBackup(const CPath& file);
 
     void DeleteEmptyDirectories(const CPath& dir);
+
+    void TryCatch(std::function<void(void)> function);
+    bool TryCatchEval(std::function<bool(void)> function);
 };

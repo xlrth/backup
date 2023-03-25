@@ -178,3 +178,40 @@ void Helpers::DeleteEmptyDirectories(const CPath& dir)
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void Helpers::TryCatch(std::function<void(void)> function)
+{
+    TryCatchEval([function]() { function(); return true; });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool Helpers::TryCatchEval(std::function<bool(void)> function)
+{
+    try
+    {
+        return function();
+    }
+    catch (const char* exception)
+    {
+        CLogger::GetInstance().LogFatal(exception);
+        return false;
+    }
+    catch (const std::string& exception)
+    {
+        CLogger::GetInstance().LogFatal(exception);
+        return false;
+    }
+    catch (const std::exception& exception)
+    {
+        CLogger::GetInstance().LogFatal(exception.what());
+        return false;
+    }
+    catch (...)
+    {
+        CLogger::GetInstance().LogFatal("unknown exception");
+        return false;
+    }
+}

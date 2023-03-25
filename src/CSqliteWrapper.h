@@ -16,7 +16,7 @@ public:
     public:
         CStatement(CStatement&& other);
         CStatement(sqlite3_stmt* statement);
-        ~CStatement() noexcept(false);
+        ~CStatement();
 
         bool        HasData();
 
@@ -32,7 +32,7 @@ public:
     CSqliteWrapper();
     CSqliteWrapper(const CPath& path, bool readOnly);
     CSqliteWrapper(CSqliteWrapper&& other);
-    ~CSqliteWrapper() noexcept(false);
+    ~CSqliteWrapper();
 
     CSqliteWrapper& operator = (CSqliteWrapper&& other);
 

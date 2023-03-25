@@ -85,7 +85,7 @@ bool ParseCmdLine(int argc, char** argv, std::shared_ptr<CCmd>& command, std::ve
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char** argv)
 {
-    try
+    bool successful = Helpers::TryCatchEval([argc, argv]()
     {
         VERIFY(argc > 0);
 
@@ -95,34 +95,22 @@ int main(int argc, char** argv)
         if (!ParseCmdLine(argc, argv, command, paths, options))
         {
             PrintUsage(argv[0]);
-            return 1;
+            return false;
         }
         if (!command->Run(paths, options))
         {
             PrintUsage(argv[0]);
-            return 1;
+            return false;
         }
-    }
-    catch (const char* exception)
-    {
-        CLogger::GetInstance().LogFatal(exception);
-        return 1;
-    }
-    catch (const std::string& exception)
-    {
-        CLogger::GetInstance().LogFatal(exception);
-        return 1;
-    }
-    catch (const std::exception& exception)
-    {
-        CLogger::GetInstance().LogFatal(exception.what());
-        return 1;
-    }
-    catch (...)
-    {
-        CLogger::GetInstance().LogFatal("unknown exception");
-        return 1;
-    }
+        return true;
+    });
 
-    return 0;
+    if (successful)
+    {
+        return 0;
+    }
+    else
+    {
+        return 1;
+    }
 }
