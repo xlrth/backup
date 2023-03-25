@@ -1,25 +1,84 @@
 #include <string>
 #include <deque>
 #include <vector>
+#include <map>
 
 #include "COptions.h"
 #include "CLogger.h"
-#include "CHelpers.h"
-#include "CBackup.h"
-#include "CVerify.h"
-#include "CPurge.h"
-#include "CDistill.h"
+#include "CCmdBackup.h"
+#include "CCmdVerify.h"
+#include "CCmdPurge.h"
+#include "CCmdDistill.h"
+#include "CCmdClone.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void printUsage()
+std::vector<std::pair<std::string, std::shared_ptr<CCmd>>> CreateCommands()
 {
-    CLogger::Log("usage:" "\n"
-        "  backup.exe backup   <repository-dir> <source-config-file> [-verbose] [-always_hash] [-skip_unchanged] [-verify_accessible] [-suffix=s]" "\n"
-        "  backup.exe verify   [<repository-dir>] [<snapshot-dir> ...] [-verbose] [-verify_hashes] [-write_file_table]" "\n"
-        "  backup.exe purge    <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-compact_db]" "\n"
-        "  backup.exe distill  <snapshot-dir> [<snapshot-dir> ...] [-verbose] [-compact_db] [-verify_accessible]" "\n"
-    );
+    return
+    {
+        { "backup"  , std::make_shared<CCmdBackup>()   },
+        { "verify"  , std::make_shared<CCmdVerify>()   },
+        { "purge"   , std::make_shared<CCmdPurge>()    },
+        { "distill" , std::make_shared<CCmdDistill>()  },
+        { "clone"   , std::make_shared<CCmdClone>()    },
+    };
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void PrintUsage(const CPath& executablePath)
+{
+    int COL1 = 8;
+    int COL2 = 37;
+    CLogger::GetInstance().Log("usage:");
+    for (auto& command : CreateCommands())
+    {
+        CLogger::GetInstance().Log(
+            "  " + std::filesystem::canonical(executablePath).filename().string() 
+            + " " + command.first + std::string(std::max(0, COL1 - int(command.first.length())), ' ')
+            + command.second->GetUsageSpec() + std::string(std::max(0, COL2 - int(command.second->GetUsageSpec().length())), ' ')
+            + command.second->GetOptionsSpec().GetUsageString());
+    }
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool ParseCmdLine(int argc, char** argv, std::shared_ptr<CCmd>& command, std::vector<CPath>& paths, COptions& options)
+{
+    if (argc < 2)
+    {
+        return false;
+    }
+    
+    auto commandVec = CreateCommands();
+    std::map<std::string, std::shared_ptr<CCmd>> commandMap(commandVec.begin(), commandVec.end());
+
+    if (commandMap.find(argv[1]) == commandMap.end())
+    {
+        return false;
+    }
+    command = commandMap.at(argv[1]);
+    options = command->GetOptionsSpec();
+
+    paths.clear();
+
+    std::deque<std::string> arguments(argv + 2, argv + argc);
+    while (!arguments.empty())
+    {
+        if (!options.IsCmdLineOption(arguments.front()))
+        {
+            paths.push_back(arguments.front());
+        }
+        else if (!options.ParseCmdLineArg(arguments.front()))
+        {
+            return false;
+        }
+        arguments.pop_front();
+    }
+
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -28,103 +87,40 @@ int main(int argc, char** argv)
 {
     try
     {
-        std::string                 command = CHelpers::ToUpper(argv[1]);
-        std::deque<std::string>     arguments(argv + 2, argv + argc);
-        std::vector<CPath>          paths;
+        VERIFY(argc > 0);
 
-        while (!arguments.empty())
+        std::shared_ptr<CCmd>   command;
+        std::vector<CPath>      paths;
+        COptions                options;
+        if (!ParseCmdLine(argc, argv, command, paths, options))
         {
-            if (CHelpers::ToUpper(arguments.front()) == "-VERBOSE")
-            {
-                COptions::GetSingletonNonConst().verbose = true;
-            }
-            else if (CHelpers::ToUpper(arguments.front()) == "-ALWAYS_HASH")
-            {
-                COptions::GetSingletonNonConst().alwaysHash = true;
-            }
-            else if (CHelpers::ToUpper(arguments.front()) == "-SKIP_UNCHANGED")
-            {
-                COptions::GetSingletonNonConst().skipUnchanged = true;
-            }
-            else if (CHelpers::ToUpper(arguments.front()) == "-VERIFY_HASHES")
-            {
-                COptions::GetSingletonNonConst().verifyHashes = true;
-            }
-            else if (CHelpers::ToUpper(arguments.front()) == "-WRITE_FILE_TABLE")
-            {
-                COptions::GetSingletonNonConst().writeFileTable = true;
-            }
-            else if (CHelpers::ToUpper(arguments.front()) == "-COMPACT_DB")
-            {
-                COptions::GetSingletonNonConst().compactDB = true;
-            }
-            else if (CHelpers::ToUpper(arguments.front()) == "-VERIFY_ACCESSIBLE")
-            {
-                COptions::GetSingletonNonConst().verifyAccessible = true;
-            }
-            else if (CHelpers::ToUpper(arguments.front()).substr(0, std::strlen("-SUFFIX=")) == "-SUFFIX=")
-            {
-                COptions::GetSingletonNonConst().suffix = arguments.front().substr(std::strlen("-SUFFIX="));
-            }
-            else
-            {
-                paths.push_back(arguments.front());
-            }
-            arguments.pop_front();
+            PrintUsage(argv[0]);
+            return 1;
         }
-
-        if (command == "BACKUP")
+        if (!command->Run(paths, options))
         {
-            if (!CBackup::Run(paths))
-            {
-                printUsage();
-                return 1;
-            }
+            PrintUsage(argv[0]);
+            return 1;
         }
-        else if (command == "VERIFY")
-        {
-            if (!CVerify::Run(paths))
-            {
-                printUsage();
-                return 1;
-            }
-        }
-        else if (command == "PURGE")
-        {
-            if (!CPurge::Run(paths))
-            {
-                printUsage();
-                return 1;
-            }
-        }
-        else if (command == "DISTILL")
-        {
-            if (!CDistill::Run(paths))
-            {
-                printUsage();
-                return 1;
-            }
-        }
-
     }
     catch (const char* exception)
     {
-        CLogger::LogFatal(exception);
+        CLogger::GetInstance().LogFatal(exception);
         return 1;
     }
     catch (const std::string& exception)
     {
-        CLogger::LogFatal(exception);
+        CLogger::GetInstance().LogFatal(exception);
         return 1;
     }
     catch (const std::exception& exception)
     {
-        CLogger::LogFatal(exception.what());
+        CLogger::GetInstance().LogFatal(exception.what());
         return 1;
     }
     catch (...)
     {
-        CLogger::LogFatal("unknown exception");
+        CLogger::GetInstance().LogFatal("unknown exception");
         return 1;
     }
 

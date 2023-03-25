@@ -1,4 +1,4 @@
 pushd %~dp0
-..\x64\Release\Backup.exe distill %1 -verbose -compact_db -verify_accessible
+..\x64\Release\Backup.exe distill --verbose --compact_db %*
 popd
 pause

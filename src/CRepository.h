@@ -3,34 +3,36 @@
 #include <vector>
 #include <memory>
 
+#include "Helpers.h"
 #include "CPath.h"
 #include "CRepoFile.h"
 #include "CSnapshot.h"
 
 class CRepository
 {
+public: // static
+    static CRepository          StaticGetParentRepository(const std::vector<CPath>& snapshotPaths);
+    static std::vector<CPath>   StaticGetSnapshotPaths(const CPath repositoryPath);
+    static void                 StaticValidateSnapshotPaths(const std::vector<CPath>& snapshotPaths);
+
 public:
     CRepository() = default;
-    CRepository(const CPath& repositoryPath);
+    CRepository(const CPath& path, bool create);
 
-    void OpenSnapshot(const CPath& snapshotPath);
-    void CloseSnapshot(const CPath& snapshotPath);
+    const CPath& GetAbsolutePath() const;
 
-    CSnapshot& CreateSnapshot(const std::string& suffix = "");
+    void Open(const CPath& path, bool create);
+    void Close();
 
-    const std::vector<std::unique_ptr<CSnapshot>>&   GetAllSnapshots() const;
-    std::vector<std::unique_ptr<CSnapshot>>&         GetAllSnapshots();
+    const std::vector<std::shared_ptr<CSnapshot>>&  GetAllSnapshots() const;
 
-    void ReorderSnapshotsByDistance(const CPath& centerSnapshotPath);
+    void                        AttachSnapshot(std::shared_ptr<CSnapshot> snapshot);
+    std::shared_ptr<CSnapshot>  DetachSnapshot(const CPath& snapshotPath);
 
-    CRepoFile FindFile(const CRepoFile& constraints, bool verifyAccessible, bool preferLinkable) const;
 
-public: // static
-    static std::vector<CPath> GetSnapshotPaths(const CPath repositoryPath);
+    CRepoFile FindFile(const CRepoFile& constraints, bool preferLinkable) const;
 
 private:
-    static std::chrono::system_clock::time_point    SnapshotPathAsTime(const CPath& snapshotPath);
-
-    CPath                                       mRepositoryPath;
-    std::vector<std::unique_ptr<CSnapshot>>     mSnapshots;
+    CPath                                       mPath;
+    std::vector<std::shared_ptr<CSnapshot>>     mSnapshots;
 };

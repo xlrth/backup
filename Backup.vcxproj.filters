@@ -17,12 +17,6 @@
     <ClInclude Include="src\picosha2.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\CDate.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\CHelpers.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\CLogger.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -47,27 +41,36 @@
     <ClInclude Include="src\CSqliteWrapper.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\CBackup.h">
+    <ClInclude Include="src\CCmd.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\CDistill.h">
+    <ClInclude Include="src\CCmdBackup.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\CPurge.h">
+    <ClInclude Include="src\CCmdClone.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\CVerify.h">
+    <ClInclude Include="src\CCmdDistill.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CCmdPurge.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CCmdVerify.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CFileTable.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Helpers.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\CTime.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\sqlite3.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\CDate.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\CHelpers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\CLogger.cpp">
@@ -94,19 +97,31 @@
     <ClCompile Include="src\CSqliteWrapper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\CDistill.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\CPurge.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\CVerify.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\Main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\CBackup.cpp">
+    <ClCompile Include="src\CCmdBackup.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CCmdClone.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CCmdDistill.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CCmdPurge.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CCmdVerify.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CFileTable.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Helpers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\CTime.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

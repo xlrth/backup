@@ -23,38 +23,43 @@
     <None Include="TODO.md" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\CBackup.h" />
-    <ClInclude Include="src\CDate.h" />
-    <ClInclude Include="src\CDistill.h" />
-    <ClInclude Include="src\CHelpers.h" />
+    <ClInclude Include="src\CCmd.h" />
+    <ClInclude Include="src\CCmdBackup.h" />
+    <ClInclude Include="src\CCmdClone.h" />
+    <ClInclude Include="src\CCmdDistill.h" />
+    <ClInclude Include="src\CCmdPurge.h" />
+    <ClInclude Include="src\CCmdVerify.h" />
+    <ClInclude Include="src\CFileTable.h" />
     <ClInclude Include="src\CLogger.h" />
     <ClInclude Include="src\COptions.h" />
     <ClInclude Include="src\CPath.h" />
-    <ClInclude Include="src\CPurge.h" />
     <ClInclude Include="src\CRepoFile.h" />
     <ClInclude Include="src\CRepository.h" />
     <ClInclude Include="src\CSize.h" />
     <ClInclude Include="src\CSnapshot.h" />
     <ClInclude Include="src\CSqliteWrapper.h" />
-    <ClInclude Include="src\CVerify.h" />
+    <ClInclude Include="src\CTime.h" />
+    <ClInclude Include="src\Helpers.h" />
     <ClInclude Include="src\picosha2.h" />
     <ClInclude Include="src\sqlite3.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\CBackup.cpp" />
-    <ClCompile Include="src\CDate.cpp" />
-    <ClCompile Include="src\CDistill.cpp" />
-    <ClCompile Include="src\CHelpers.cpp" />
+    <ClCompile Include="src\CCmdBackup.cpp" />
+    <ClCompile Include="src\CCmdClone.cpp" />
+    <ClCompile Include="src\CCmdDistill.cpp" />
+    <ClCompile Include="src\CCmdPurge.cpp" />
+    <ClCompile Include="src\CCmdVerify.cpp" />
+    <ClCompile Include="src\CFileTable.cpp" />
     <ClCompile Include="src\CLogger.cpp" />
     <ClCompile Include="src\COptions.cpp" />
     <ClCompile Include="src\CPath.cpp" />
-    <ClCompile Include="src\CPurge.cpp" />
     <ClCompile Include="src\CRepoFile.cpp" />
     <ClCompile Include="src\CRepository.cpp" />
     <ClCompile Include="src\CSize.cpp" />
     <ClCompile Include="src\CSnapshot.cpp" />
     <ClCompile Include="src\CSqliteWrapper.cpp" />
-    <ClCompile Include="src\CVerify.cpp" />
+    <ClCompile Include="src\CTime.cpp" />
+    <ClCompile Include="src\Helpers.cpp" />
     <ClCompile Include="src\Main.cpp" />
     <ClCompile Include="src\sqlite3.c" />
   </ItemGroup>
@@ -63,32 +68,31 @@
     <ProjectGuid>{46CA13B2-F1A7-42E3-B574-0FB8EDFC0661}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>Backup</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
+    <PlatformToolset>v142</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -127,10 +131,12 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_SILENCE_CXX20_U8PATH_DEPRECATION_WARNING;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <TreatWarningAsError>true</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/Zc:char8_t- %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -141,10 +147,12 @@
     <ClCompile>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_SILENCE_CXX20_U8PATH_DEPRECATION_WARNING;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <TreatWarningAsError>true</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/Zc:char8_t- %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -158,10 +166,12 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_SILENCE_CXX20_U8PATH_DEPRECATION_WARNING;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <TreatWarningAsError>true</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/Zc:char8_t- %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -176,10 +186,12 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_SILENCE_CXX20_U8PATH_DEPRECATION_WARNING;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <TreatWarningAsError>true</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <AdditionalOptions>/Zc:char8_t- %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

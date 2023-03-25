@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "CSqliteWrapper.h"
 #include "CRepoFile.h"
 
@@ -20,49 +22,47 @@ public: // types
         CSqliteWrapper::CStatement  mStatement;
     };
 
-    enum class EOpenMode
-    {
-        READ,
-        WRITE,
-        CREATE
-    };
+public: // static methods
+    static bool StaticIsExsting(const CPath& path);
+    static void StaticValidate(const CPath& path);
 
 public: // methods
     CSnapshot() = default;
     CSnapshot(CSnapshot&&) = default;
-    CSnapshot(const CPath& path, EOpenMode openMode);
+    CSnapshot(const CPath& path, bool create);
     ~CSnapshot();
 
-    static bool IsValidPath(const CPath& path);
+    const CPath&    GetAbsolutePath() const;
+    CPath           GetMetaDataPath() const;
 
-    const CPath& GetPath() const;
-
-    void Open(const CPath& path, EOpenMode openMode);
+    void Open(const CPath& path, bool create);
     void Close();
 
-    CRepoFile               FindFile(const CRepoFile& constraints, bool verifyAccessible, bool preferLinkable) const;
+    void SetInProgress();
+    void ClearInProgress();
+    bool IsInProgress();
+
+    CRepoFile               FindFile(const CRepoFile& constraints, bool preferLinkable) const;
     std::vector<CRepoFile>  FindAllFiles(const CRepoFile& constraints) const;
 
-    bool ImportFile(const CPath& source, CRepoFile& target);
-    bool DuplicateFile(const CPath& source, CRepoFile& target);
+    bool InsertFile(const CPath& source, const CRepoFile& target, bool preferLink);
     bool DeleteFile(CRepoFile& repoFile);
 
-    CIterator DBSelect(const CRepoFile& constraints) const;
-    void DBInsert(const CRepoFile& repoFile);
-    void DBDelete(const CRepoFile& repoFile);
-    void DBVerify();
-    void DBCompact();
+    CIterator   DBSelect(const CRepoFile& constraints) const;
+    void        DBInsert(const CRepoFile& repoFile);
+    void        DBDelete(const CRepoFile& repoFile);
+    bool        DBCheckIntegrity();
+    void        DBCompact();
 
 private:
-    void DBInitRead();
-    void DBInitWrite();
-    void DBInitCreate();
+    void DBInit();
 
     static std::string DBFormatConstraints(const CRepoFile& constraints);
 
-    CPath                                   mPath;
-    CPath                                   mSqliteFile;
-    mutable CSqliteWrapper                  mDb;
-    CPath                                   mLockFilePath;
-    std::ofstream                           mLockFileHandle;
+    CPath                       mPath;
+    mutable CSqliteWrapper      mSqliteDB;
+
+    inline static const CPath   META_DATA_PATH          = ".backup";
+    inline static const CPath   DB_FILE_PATH            = META_DATA_PATH / "db.sqlite";
+    inline static const CPath   IN_PROGRESS_FILE_PATH   = META_DATA_PATH / "IN_PROGRESS";
 };

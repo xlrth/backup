@@ -2,7 +2,7 @@
 
 #include <assert.h>
 
-#include "CHelpers.h"
+#include "Helpers.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -23,10 +23,7 @@ CSqliteWrapper::CStatement::CStatement(CStatement&& other)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 CSqliteWrapper::CStatement::~CStatement() noexcept(false)
 {
-    if (mStatement != nullptr)
-    {
-        VERIFY(SQLITE_OK == sqlite3_finalize(mStatement));
-    }
+    Finalize();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -40,8 +37,7 @@ bool CSqliteWrapper::CStatement::HasData()
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 long long CSqliteWrapper::CStatement::ReadInt(int col)
 {
-// disabling assertion: fails for old format snapshots
-//    assert(sqlite3_column_type(mStatement, col) == SQLITE_INTEGER);
+    VERIFY(sqlite3_column_type(mStatement, col) == SQLITE_INTEGER);
     return sqlite3_column_int64(mStatement, col);
 }
 
@@ -49,8 +45,19 @@ long long CSqliteWrapper::CStatement::ReadInt(int col)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 std::string CSqliteWrapper::CStatement::ReadString(int col)
 {
-    assert(sqlite3_column_type(mStatement, col) == SQLITE_TEXT);
-    return (const char*)sqlite3_column_text(mStatement, col);
+    VERIFY(sqlite3_column_type(mStatement, col) == SQLITE_TEXT);
+    return reinterpret_cast<const char*>(sqlite3_column_text(mStatement, col));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void CSqliteWrapper::CStatement::Finalize()
+{
+    if (mStatement != nullptr)
+    {
+        VERIFY(SQLITE_OK == sqlite3_finalize(mStatement));
+        mStatement = nullptr;
+    }
 }
 
 
@@ -64,39 +71,41 @@ std::string CSqliteWrapper::CStatement::ReadString(int col)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 CSqliteWrapper::CSqliteWrapper()
     :
-    mDb(nullptr)
+    mSqliteHandle(nullptr)
 {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-CSqliteWrapper::CSqliteWrapper(const std::string& path, bool readOnly)
+CSqliteWrapper::CSqliteWrapper(const CPath& path, bool readOnly)
     :
-    mDb(nullptr)
+    mSqliteHandle(nullptr)
 {
+    int flags;
     if (readOnly)
     {
-        VERIFY(SQLITE_OK == sqlite3_open_v2(path.c_str(), &mDb, SQLITE_OPEN_READONLY, nullptr));
+        flags = SQLITE_OPEN_READONLY;
     }
     else
     {
-        VERIFY(SQLITE_OK == sqlite3_open_v2(path.c_str(), &mDb, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nullptr));
+        flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE;
     }
+    VERIFY(SQLITE_OK == sqlite3_open_v2(reinterpret_cast<const char*>(path.u8string().c_str()), &mSqliteHandle, flags, nullptr));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 CSqliteWrapper::CSqliteWrapper(CSqliteWrapper&& other)
     :
-    mDb(other.mDb)
+    mSqliteHandle(other.mSqliteHandle)
 {
-    other.mDb = nullptr;
+    other.mSqliteHandle = nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 CSqliteWrapper::~CSqliteWrapper() noexcept(false)
 {
-    if (mDb != nullptr)
+    if (mSqliteHandle != nullptr)
     {
         Close();
     }
@@ -106,8 +115,8 @@ CSqliteWrapper::~CSqliteWrapper() noexcept(false)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 CSqliteWrapper& CSqliteWrapper::operator = (CSqliteWrapper&& other)
 {
-    mDb = other.mDb;
-    other.mDb = nullptr;
+    mSqliteHandle = other.mSqliteHandle;
+    other.mSqliteHandle = nullptr;
     return *this;
 }
 
@@ -115,33 +124,33 @@ CSqliteWrapper& CSqliteWrapper::operator = (CSqliteWrapper&& other)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 bool CSqliteWrapper::IsOpen() const
 {
-    return mDb != nullptr;
+    return mSqliteHandle != nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CSqliteWrapper::Close()
 {
-    VERIFY(mDb != nullptr);
-    VERIFY(SQLITE_OK == sqlite3_close(mDb));
-    mDb = nullptr;
+    VERIFY(mSqliteHandle != nullptr);
+    VERIFY(SQLITE_OK == sqlite3_close(mSqliteHandle));
+    mSqliteHandle = nullptr;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CSqliteWrapper::RunQuery(const std::string& query)
 {
-    VERIFY(mDb != nullptr);
-    VERIFY(SQLITE_OK == sqlite3_exec(mDb, query.c_str(), nullptr, nullptr, nullptr));
+    VERIFY(mSqliteHandle != nullptr);
+    VERIFY(SQLITE_OK == sqlite3_exec(mSqliteHandle, query.c_str(), nullptr, nullptr, nullptr));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 CSqliteWrapper::CStatement CSqliteWrapper::StartQuery(const std::string& query)
 {
-    VERIFY(mDb != nullptr);
+    VERIFY(mSqliteHandle != nullptr);
     sqlite3_stmt* statement;
-    VERIFY(SQLITE_OK == sqlite3_prepare_v2(mDb, query.c_str(), -1, &statement, 0));
+    VERIFY(SQLITE_OK == sqlite3_prepare_v2(mSqliteHandle, query.c_str(), -1, &statement, 0));
     return statement;
 }
 

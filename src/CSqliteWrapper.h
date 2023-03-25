@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "CPath.h"
+
 #include "sqlite3.h"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -17,15 +19,18 @@ public:
         ~CStatement() noexcept(false);
 
         bool        HasData();
+
         long long   ReadInt(int col);
         std::string ReadString(int col);
+
+        void        Finalize();
 
     private:
         sqlite3_stmt* mStatement;
     };
 
     CSqliteWrapper();
-    CSqliteWrapper(const std::string& path, bool readOnly);
+    CSqliteWrapper(const CPath& path, bool readOnly);
     CSqliteWrapper(CSqliteWrapper&& other);
     ~CSqliteWrapper() noexcept(false);
 
@@ -37,5 +42,5 @@ public:
     CStatement  StartQuery(const std::string& query);
 
 private:
-    sqlite3* mDb;
+    sqlite3* mSqliteHandle;
 };

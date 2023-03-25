@@ -2,49 +2,109 @@
 
 #include "CLogger.h"
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+COptions::COptions(const std::vector<std::string> boolNames, const std::vector<std::string> stringNames)
+{
+    SetOptionsSpec(boolNames, stringNames);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void COptions::SetOptionsSpec(const std::vector<std::string> boolNames, const std::vector<std::string> stringNames)
+{
+    mBoolNames = boolNames;
+    mStringNames = stringNames;
+
+    for (auto name : boolNames)
+    {
+        mBoolOpts[name] = false;
+    }
+    for (auto name : stringNames)
+    {
+        mStringOpts[name] = "";
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+std::string COptions::GetUsageString() const
+{
+    std::string result;
+    for (auto name : mBoolNames)
+    {
+        result += " [--" + name + "]";
+    }
+    for (auto name : mStringNames)
+    {
+        result += " [--" + name + "=s]";
+    }
+    return result;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool COptions::IsCmdLineOption(const std::string& arg)
+{
+    return arg.length() >= 2 && arg.substr(0, 2) == "--";
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool COptions::ParseCmdLineArg(const std::string& arg)
+{
+    std::string key = arg.substr(2);
+    std::string val;
+    if (key.find_first_of('=') != std::string::npos)
+    {
+        val = key.substr(key.find_first_of('=') + 1);
+        key = key.substr(0, key.find_first_of('='));
+    }
+    if (mBoolOpts.find(key) != mBoolOpts.end())
+    {
+        mBoolOpts.at(key) = true;
+        return true;
+    }
+    if (mStringOpts.find(key) != mStringOpts.end())
+    {
+        mStringOpts.at(key) = val;
+        return true;
+    }
+    return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool COptions::GetBool(const std::string& name) const
+{
+    return mBoolOpts.at(name);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+std::string COptions::GetString(const std::string& name) const
+{
+    return mStringOpts.at(name);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 void COptions::Log() const
 {
-    if (verbose)
+    std::string PREFIX_BOOL   = "option enabled: ";
+    std::string PREFIX_STRING = "option defined: ";
+    for (auto opt : mBoolOpts)
     {
-        CLogger::Log("verbose enabled");
+        if (opt.second)
+        {
+            CLogger::GetInstance().Log(PREFIX_BOOL + opt.first);
+        }
     }
-    if (alwaysHash)
+    for (auto opt : mStringOpts)
     {
-        CLogger::Log("always hashing enabled");
+        if (!opt.second.empty())
+        {
+            CLogger::GetInstance().Log(PREFIX_STRING + opt.first + "=" + opt.second);
+        }
     }
-    if (skipUnchanged)
-    {
-        CLogger::Log("skip unchanged enabled");
-    }
-    if (verifyHashes)
-    {
-        CLogger::Log("verify hashes enabled");
-    }
-    if (writeFileTable)
-    {
-        CLogger::Log("write file table enabled");
-    }
-    if (compactDB)
-    {
-        CLogger::Log("compact db enabled");
-    }
-    if (verifyAccessible)
-    {
-        CLogger::Log("verify accessible enabled");
-    }
-    if (mHardLinkMinBytes != 512 + 1)
-    {
-        CLogger::Log("min bytes for hard link = " + std::to_string(mHardLinkMinBytes));
-    }
-}
-
-COptions& COptions::GetSingletonNonConst()
-{
-    static COptions sSingleton;
-    return sSingleton;
-}
-
-const COptions& COptions::GetSingleton()
-{
-    return GetSingletonNonConst();
 }

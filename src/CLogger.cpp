@@ -1,62 +1,67 @@
 #include "CLogger.h"
 
-#include "CHelpers.h"
-
 #include <iostream>
 #include <iomanip>
 #include <sstream>
 #include <algorithm>
 
 #ifdef _WIN32 
+#   define WIN32_LEAN_AND_MEAN
 #   include <Windows.h>
-HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-#   ifdef _DEBUG
-#       define WIN32_LEAN_AND_MEAN
-        // needed for OutputDebugString
-#   endif
 #endif
 
-static CLogger sSingleton;
+#include "Helpers.h"
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+CLogger& CLogger::GetInstance()
+{
+    static CLogger sSingleton;
+    return sSingleton;
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CLogger::Init(const CPath& basePath)
 {
-    sSingleton.mSessionStartTime = std::chrono::system_clock::now();
-    sSingleton.mSessionErrorCount = 0;
-    sSingleton.mSessionWarningCount = 0;
+    VERIFY(!mLogFileHandle.is_open());
 
-    sSingleton.mLogFilePath = basePath / "log.txt";
+    mSessionStartTime = std::chrono::system_clock::now();
+    mSessionErrorCount = 0;
+    mSessionWarningCount = 0;
 
-    CHelpers::MakeBackup(sSingleton.mLogFilePath);
-    CHelpers::MakeWritable(sSingleton.mLogFilePath);
+    mLogFilePath = basePath / "log.txt";
 
-    sSingleton.mLogFileHandle = std::ofstream(sSingleton.mLogFilePath.string());
-    if (!sSingleton.mLogFileHandle.is_open())
+    Helpers::MakeBackup(mLogFilePath);
+    Helpers::MakeWritable(mLogFilePath);
+
+    mLogFileHandle = std::ofstream(mLogFilePath.string());
+    if (!mLogFileHandle.is_open())
     {
-        throw "cannot open log file " + sSingleton.mLogFilePath.string();
+        throw "cannot open log file " + mLogFilePath.string();
     }
 
-    if (!::SetConsoleOutputCP(1252))
+    for (auto& message : mMessageBuffer)
     {
-        LogWarning("SetConsoleCP failed with error code " + ::GetLastError());
+        mLogFileHandle << message << std::endl;
     }
+    mMessageBuffer.clear();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CLogger::Close()
 {
-    Log("elapsed time: " + CHelpers::ElapsedTimeAsString(sSingleton.mSessionStartTime));
-    Log("warnings: " + std::to_string(sSingleton.mSessionWarningCount));
-    Log("errors:   " + std::to_string(sSingleton.mSessionErrorCount));
+    Log("elapsed time: " + Helpers::ElapsedTimeAsString(mSessionStartTime));
+    Log("warnings: " + std::to_string(mSessionWarningCount), mSessionWarningCount > 0 ? COLOR_WARNING : COLOR_DEFAULT);
+    Log("errors:   " + std::to_string(mSessionErrorCount), mSessionErrorCount > 0 ? COLOR_ERROR : COLOR_DEFAULT);
 
-    if (sSingleton.mLogFileHandle.is_open())
+    if (mLogFileHandle.is_open())
     {
-        sSingleton.mLogFileHandle.close();
+        mLogFileHandle.close();
 
-        CHelpers::MakeReadOnly(sSingleton.mLogFilePath);
-        CHelpers::MakeBackup(sSingleton.mLogFilePath);
+        Helpers::MakeReadOnly(mLogFilePath);
+        Helpers::MakeBackup(mLogFilePath);
     }
 }
 
@@ -64,36 +69,54 @@ void CLogger::Close()
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CLogger::LogTotalEventCount()
 {
-    Log("total elapsed time: "  + CHelpers::ElapsedTimeAsString(sSingleton.mTotalStartTime));
-    Log("total warnings: "      + std::to_string(sSingleton.mTotalWarningCount));
-    Log("total errors:   "      + std::to_string(sSingleton.mTotalErrorCount));
+    Log("total elapsed time: "  + Helpers::ElapsedTimeAsString(mTotalStartTime));
+    Log("total warnings: "      + std::to_string(mTotalWarningCount), mTotalWarningCount > 0 ? COLOR_WARNING : COLOR_DEFAULT);
+    Log("total errors:   "      + std::to_string(mTotalErrorCount), mTotalErrorCount > 0 ? COLOR_ERROR : COLOR_DEFAULT);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void CLogger::Log(const std::string& str, EColor color)
+void CLogger::EnableDebugLog(bool enable)
 {
-    if (sSingleton.mLogFileHandle.is_open())
+    mEnableDebugLog = enable;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool CLogger::IsDebugLogEnabled() const
+{
+    return mEnableDebugLog;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void CLogger::Log(const std::string& str, const std::string& color)
+{
+    if (mLogFileHandle.is_open())
     {
-        sSingleton.mLogFileHandle << str << std::endl;
+        mLogFileHandle << str << std::endl;
+    }
+    else
+    {
+        mMessageBuffer.push_back(str);
     }
 
 #ifdef _WIN32 
-    SetConsoleTextAttribute(hConsole, static_cast<WORD>(color));
-// alternate solution:
-//    std::cout << "\033[32mThis is green\033[0m" << std::endl;
-#endif
-
-    std::cout << str << std::endl;
-
-#ifdef _WIN32 
-    SetConsoleTextAttribute(hConsole, 15);
-
 #   ifdef _DEBUG
     OutputDebugStringA(str.c_str());
     OutputDebugStringA("\n");
 #   endif
+
+    ::SetConsoleOutputCP(WINDOWS_CONSOLE_OUTPUT_CODEPAGE);
+    DWORD dwMode = 0;
+    if (!GetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), &dwMode))
+    {
+        return;
+    }
+    ::SetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), dwMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
 #endif
+
+    std::cout << color << str << COLOR_DEFAULT << std::endl;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -101,8 +124,8 @@ void CLogger::Log(const std::string& str, EColor color)
 void CLogger::LogWarning(const std::string& str, const std::error_code& errorCode)
 {
     Log("WARNING: " + str + (errorCode ? " error: " + errorCode.message() : ""), COLOR_WARNING);
-    sSingleton.mSessionWarningCount++;
-    sSingleton.mTotalWarningCount++;
+    mSessionWarningCount++;
+    mTotalWarningCount++;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,8 +133,8 @@ void CLogger::LogWarning(const std::string& str, const std::error_code& errorCod
 void CLogger::LogError(const std::string& str, const std::error_code& errorCode)
 {
     Log("ERROR: " + str + (errorCode ? " error: " + errorCode.message() : ""), COLOR_ERROR);
-    sSingleton.mSessionErrorCount++;
-    sSingleton.mTotalErrorCount++;
+    mSessionErrorCount++;
+    mTotalErrorCount++;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,6 +142,6 @@ void CLogger::LogError(const std::string& str, const std::error_code& errorCode)
 void CLogger::LogFatal(const std::string& str, const std::error_code& errorCode)
 {
     Log("FATAL: " + str + (errorCode ? " error: " + errorCode.message() : ""), COLOR_FATAL);
-    sSingleton.mSessionErrorCount++;
-    sSingleton.mTotalErrorCount++;
+    mSessionErrorCount++;
+    mTotalErrorCount++;
 }

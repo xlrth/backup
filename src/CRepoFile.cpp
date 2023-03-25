@@ -2,25 +2,31 @@
 
 #include <thread>
 #include <iomanip>
-
-#include "picosha2.h"
-
-#include "COptions.h"
-#include "CLogger.h"
-#include "CHelpers.h"
+#include <regex>
 
 #ifdef _WIN32
 #   define WIN32_LEAN_AND_MEAN
 #   include <windows.h>
 #   include <io.h> 
+#else
+#   include <sys/stat.h>
+#   include <fcntl.h>
+#   include <ext/stdio_filebuf.h>
 #endif
 
+#include "picosha2.h"
+
+#include "COptions.h"
+#include "CLogger.h"
+#include "Helpers.h"
+
 #ifdef _WIN32
-static constexpr long long MAX_HARD_LINK_COUNT = 1023;
+static constexpr long long  MAX_HARD_LINK_COUNT = 1023;
+static constexpr long long  HARD_LINK_MIN_BYTES = 513;
 #else
 #   include <linux/limits.h>
-#error TODO: DEFINE MAX_HARD_LINK_COUNT FOR NON-WINDOWS
-static constexpr long long MAX_HARD_LINK_COUNT = 
+static constexpr long long  MAX_HARD_LINK_COUNT = 65000;
+static constexpr long long  HARD_LINK_MIN_BYTES = 0;
 #endif
 
 
@@ -38,18 +44,18 @@ long long CRepoFile::sBytesDeleted  = 0;
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 CRepoFile::CRepoFile(
     CPath           sourcePath,
-    CPath           parentPath,
-    CPath           relativePath,
     CSize           size,
-    CDate           date,
-    std::string     hash)
+    CTime           time,
+    std::string     hash,
+    CPath           relativePath,
+    CPath           parentPath)
     :
     mSourcePath(sourcePath),
-    mParentPath(parentPath),
-    mRelativePath(relativePath),
     mSize(size),
-    mDate(date),
-    mHash(hash)
+    mTime(time),
+    mHash(hash),
+    mRelativePath(relativePath),
+    mParentPath(parentPath)
 {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,20 +67,6 @@ CPath CRepoFile::GetSourcePath() const
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-CPath CRepoFile::GetParentPath() const
-{
-    return mParentPath;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-CPath CRepoFile::GetRelativePath() const
-{
-    return mRelativePath;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
 CSize CRepoFile::GetSize() const
 {
     return mSize;
@@ -82,9 +74,9 @@ CSize CRepoFile::GetSize() const
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-CDate CRepoFile::GetDate() const
+CTime CRepoFile::GetTime() const
 {
-    return mDate;
+    return mTime;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -96,23 +88,37 @@ const std::string& CRepoFile::GetHash() const
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+bool CRepoFile::HasHash() const
+{
+    return !mHash.empty();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+CPath CRepoFile::GetRelativePath() const
+{
+    return mRelativePath;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+CPath CRepoFile::GetParentPath() const
+{
+    return mParentPath;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+CPath CRepoFile::GetFullPath() const
+{
+    return mParentPath / mRelativePath;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 void CRepoFile::SetSourcePath(const CPath& sourcePath)
 {
     mSourcePath = sourcePath;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-void CRepoFile::SetParentPath(const CPath& parentPath)
-{
-    mParentPath = parentPath;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-void CRepoFile::SetRelativePath(const CPath& relativePath)
-{
-    mRelativePath = relativePath;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -124,9 +130,9 @@ void CRepoFile::SetSize(CSize size)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void CRepoFile::SetDate(CDate date)
+void CRepoFile::SetTime(CTime time)
 {
-    mDate = date;
+    mTime = time;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -138,25 +144,45 @@ void CRepoFile::SetHash(const std::string& hash)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+void CRepoFile::SetRelativePath(const CPath& relativePath)
+{
+    mRelativePath = relativePath;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void CRepoFile::SetParentPath(const CPath& parentPath)
+{
+    mParentPath = parentPath;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 bool CRepoFile::IsExisting() const
 {
-    return std::experimental::filesystem::exists(GetFullPath());
+    return std::filesystem::exists(GetFullPath());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 bool CRepoFile::IsLinkable() const
 {
+    if (GetSize() < HARD_LINK_MIN_BYTES)
+    {
+        return true;
+    }
+
     std::error_code errorCode;
-    auto hardLinkCount = std::experimental::filesystem::hard_link_count(GetFullPath(), errorCode);
+    auto hardLinkCount = std::filesystem::hard_link_count(GetFullPath(), errorCode);
     if (errorCode)
     {
-        CLogger::LogWarning("cannot get hard link count: " + ToString(), errorCode);
+        CLogger::GetInstance().LogWarning("cannot get hard link count: " + ToString(), errorCode);
         return false;
     }
 
     if (hardLinkCount >= MAX_HARD_LINK_COUNT)
     {
+        CLogger::GetInstance().LogWarning("hard link limit reached: " + ToString(), errorCode);
         return false;
     }
 
@@ -165,7 +191,7 @@ bool CRepoFile::IsLinkable() const
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-bool CRepoFile::OpenSource()
+bool CRepoFile::LockSource()
 {
     if (mSourceFileHandle)
     {
@@ -175,34 +201,52 @@ bool CRepoFile::OpenSource()
     mSourceFileHandle = std::make_shared<std::ifstream>();
     for (int i = 0; i < 10; i++)
     {
-        mSourceFileHandle->open(mSourcePath.wstring(), std::ios::binary);
+#ifdef _WIN32
+        mSourceFileHandle->open(mSourcePath.wstring(), std::ios::binary, _SH_DENYWR);
         if (mSourceFileHandle->is_open())
         {
             return true;
         }
+#else
+        mSourceFileHandle->open(mSourcePath.string(), std::ios::binary);
+        if (mSourceFileHandle->is_open())
+        {
+            flock fl = { F_RDLCK, SEEK_SET, 0, 0, 0 };
+            int fd = static_cast<__gnu_cxx::stdio_filebuf<char> *const>(mSourceFileHandle->rdbuf())->fd();
+            if (::fcntl(fd, F_SETFD, &fl) != -1)
+            {
+                return true;
+            }
+            mSourceFileHandle->close();
+        }
+#endif
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
     mSourceFileHandle.reset();
-
-    CLogger::LogWarning("source file not accessible: " + SourceToString());
 
     return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void CRepoFile::CloseSource()
+void CRepoFile::UnlockSource()
 {
     mSourceFileHandle.reset();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+bool CRepoFile::IsSourceLocked()
+{
+    return mSourceFileHandle->is_open();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 bool CRepoFile::HashSource()
 {
-    if (!OpenSource())
+    if (!LockSource())
     {
-        CLogger::LogWarning("source file not hashable: " + SourceToString());
         return false;
     }
 
@@ -216,48 +260,15 @@ bool CRepoFile::HashSource()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-bool CRepoFile::Open()
-{
-    if (mFileHandle)
-    {
-        return true;
-    }
-
-    mFileHandle = std::make_shared<std::ifstream>();
-    for (int i = 0; i < 10; i++)
-    {
-        mFileHandle->open(GetFullPath().wstring(), std::ios::binary);
-        if (mFileHandle->is_open())
-        {
-            return true;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    mFileHandle.reset();
-
-    CLogger::LogWarning("file not accessible: " + ToString());
-
-    return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-void CRepoFile::Close()
-{
-    mFileHandle.reset();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
 bool CRepoFile::Hash()
 {
-    if (!Open())
+    std::ifstream fileHandle(GetFullPath().string(), std::ios::binary);
+    if (!fileHandle.is_open())
     {
-        CLogger::LogWarning("file not hashable: " + ToString());
         return false;
     }
-        
-    mHash = picosha2::hash256_hex_string(std::istreambuf_iterator<char>(*mFileHandle), std::istreambuf_iterator<char>());
+
+    mHash = picosha2::hash256_hex_string(std::istreambuf_iterator<char>(fileHandle), std::istreambuf_iterator<char>());
 
     sFilesHashed++;
     sBytesHashed += GetSize();
@@ -267,77 +278,47 @@ bool CRepoFile::Hash()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-CPath CRepoFile::GetFullPath() const
-{
-    return mParentPath / mRelativePath;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-std::string CRepoFile::SourceToString() const
-{
-    return CHelpers::NumberAsString(mSize, 15)
-        + " " + CHelpers::TimeAsString(mDate)
-        + " " + mSourcePath.string();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-std::string CRepoFile::ToString() const
-{
-    return CHelpers::NumberAsString(mSize, 15)
-        + " " + CHelpers::TimeAsString(mDate)
-        + " " + GetFullPath().string();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-std::string CRepoFile::ToCSV() const
-{
-    std::ostringstream ss;
-    ss << std::setw(12) << mSize;
-
-    return ss.str()
-        + ", " + CHelpers::TimeAsString(mDate)
-        + ", " + GetFullPath().string();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
 bool CRepoFile::Copy(const CPath& source) const
 {
     std::error_code errorCode;
 
     CPath directory = GetFullPath().parent_path();
-    if (!std::experimental::filesystem::exists(directory) && !std::experimental::filesystem::create_directories(directory, errorCode))
+    if (!std::filesystem::exists(directory) && !std::filesystem::create_directories(directory, errorCode))
     {
-        CLogger::LogWarning("cannot create directories: " + ToString(), errorCode);
+        CLogger::GetInstance().LogWarning("cannot create directories: " + ToString(), errorCode);
         return false;
     }
 
-    if (!std::experimental::filesystem::copy_file(source, GetFullPath(), std::experimental::filesystem::copy_options::copy_symlinks, errorCode))
+    if (!std::filesystem::copy_file(source, GetFullPath(), errorCode))
     {
-        CLogger::LogWarning("cannot copy: " + ToString() + " from: " + source.string(), errorCode);
+        CLogger::GetInstance().LogWarning("cannot copy: " + ToString() + " from: " + source.string(), errorCode);
         return false;
     }
 
     sFilesCopied++;
     sBytesCopied += GetSize();
 
-    LOG_DEBUG("copied: " + ToString() + " from: " + source.string(), GetSize() < COptions::GetSingleton().mHardLinkMinBytes ? COLOR_COPY_SMALL : COLOR_COPY);
-
-#ifndef _WIN32 // fixes modification date not being copied under linux
-    auto lastWriteTime = std::experimental::filesystem::last_write_time(source, errorCode);
-    if (errorCode)
+    if (GetSize() < HARD_LINK_MIN_BYTES)
     {
-        LogWarning("cannot read modification date from " + source.string(), errorCode);
+        LOG_DEBUG("copied (small): " + ToString() + " from: " + source.string(), COLOR_COPY_SMALL);
     }
     else
     {
-        std::experimental::filesystem::last_write_time(GetFullPath(), lastWriteTime, errorCode);
+        LOG_DEBUG("copied: " + ToString() + " from: " + source.string(), COLOR_COPY);
+    }
+
+#ifndef _WIN32 // fixes modification time not being copied under linux
+    auto lastWriteTime = std::filesystem::last_write_time(source, errorCode);
+    if (errorCode)
+    {
+        CLogger::GetInstance().LogWarning("cannot read modification time from " + source.string(), errorCode);
+    }
+    else
+    {
+        std::filesystem::last_write_time(GetFullPath(), lastWriteTime, errorCode);
         if (errorCode)
         {
-            LogWarning("cannot set modification date of " + ToString(), errorCode);
+            CLogger::GetInstance().LogWarning("cannot set modification time of " + ToString(), errorCode);
         }
     }
 #endif
@@ -349,7 +330,7 @@ bool CRepoFile::Copy(const CPath& source) const
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 bool CRepoFile::Link(const CPath& source) const
 {
-    if (GetSize() < COptions::GetSingleton().mHardLinkMinBytes)
+    if (GetSize() < HARD_LINK_MIN_BYTES)
     {
         return Copy(source);
     }
@@ -357,22 +338,17 @@ bool CRepoFile::Link(const CPath& source) const
     std::error_code errorCode;
 
     CPath directory = GetFullPath().parent_path();
-    if (!std::experimental::filesystem::exists(directory) && !std::experimental::filesystem::create_directories(directory, errorCode))
+    if (!std::filesystem::exists(directory) && !std::filesystem::create_directories(directory, errorCode))
     {
-        CLogger::LogWarning("cannot create directories: " + ToString(), errorCode);
+        CLogger::GetInstance().LogWarning("cannot create directories: " + ToString(), errorCode);
         return false;
     }
 
-    std::experimental::filesystem::create_hard_link(source, GetFullPath(), errorCode);
+    std::filesystem::create_hard_link(source, GetFullPath(), errorCode);
     if (errorCode)
     {
-        if (errorCode.value() == 1142)
         {
-            CLogger::LogWarning("too many links: " + ToString() + " from: " + source.string());
-        }
-        else
-        {
-            CLogger::LogWarning("cannot link: " + ToString() + " from: " + source.string(), errorCode);
+            CLogger::GetInstance().LogWarning("cannot link: " + ToString() + " from: " + source.string(), errorCode);
         }
         return false;
     }
@@ -389,16 +365,14 @@ bool CRepoFile::Link(const CPath& source) const
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 bool CRepoFile::Delete()
 {
-    Close();
-
-    CHelpers::MakeWritable(GetFullPath());
+    Helpers::MakeWritable(GetFullPath());
 
     std::error_code errorCode;
 
-    std::experimental::filesystem::remove(GetFullPath(), errorCode);
+    std::filesystem::remove(GetFullPath(), errorCode);
     if (errorCode)
     {
-        CLogger::LogWarning("cannot delete: " + ToString(), errorCode);
+        CLogger::GetInstance().LogWarning("cannot delete: " + ToString(), errorCode);
         return false;
     }
 
@@ -412,49 +386,77 @@ bool CRepoFile::Delete()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-bool CRepoFile::ReadFileInfo(unsigned long long& fileSystemIndex, int& hardLinkCount) const
+unsigned long long CRepoFile::GetFileSystemIndex() const
 {
-    fileSystemIndex = 0;
-    hardLinkCount = 0;
-
 #ifdef _WIN32
-
-    HANDLE handle = CreateFileW(GetFullPath().wstring().c_str(), GENERIC_READ, FILE_SHARE_READ,         NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE handle = CreateFileW(GetFullPath().wstring().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (handle == INVALID_HANDLE_VALUE)
     {
-        CLogger::LogWarning("cannot read file information: " + ToString());
         return false;
     }
 
     BY_HANDLE_FILE_INFORMATION fileInformation;
     if (!GetFileInformationByHandle(handle, &fileInformation))
     {
-        CLogger::LogWarning("cannot read file information: " + ToString());
         CloseHandle(handle);
-        return false;
+        return static_cast<unsigned long long>(-1);
     }
     CloseHandle(handle);
 
-    fileSystemIndex = (unsigned long long(fileInformation.nFileIndexHigh) << 32) + unsigned long long(fileInformation.nFileIndexLow);
-    hardLinkCount = fileInformation.nNumberOfLinks;
-    return true;
+    return (static_cast<unsigned long long>(fileInformation.nFileIndexHigh) << 32)
+          + static_cast<unsigned long long>(fileInformation.nFileIndexLow);
 
 #else
+    struct stat file_stat;
+    if (::stat(GetFullPath().string().c_str(), &file_stat) < 0)
+    {
+        return static_cast<unsigned long long>(-1);
+    }
 
-    LogWarning("TODO: implement inode access to avoid multiple hashing of linked files");
-    return false;
-
+    return file_stat.st_ino;
 #endif
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+std::string CRepoFile::SourceToString() const
+{
+    return      (mSize.IsSpecified() ? Helpers::NumberAsString(mSize, 15) : std::string(15, ' '))
+        + " " + (mTime.IsSpecified() ? Helpers::TimeAsString(mTime, true) : std::string(19, ' '))
+        + " " + mSourcePath.string();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+std::string CRepoFile::ToString() const
+{
+    return      (mSize.IsSpecified() ? Helpers::NumberAsString(mSize, 15) : std::string(15, ' '))
+        + " " + (mTime.IsSpecified() ? Helpers::TimeAsString(mTime, true) : std::string(19, ' '))
+        + " " + GetFullPath().string();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+std::string CRepoFile::ToCSV() const
+{
+    std::regex regex("\"");
+    std::ostringstream ss;
+    ss << std::setw(12) << mSize
+        << ","      << Helpers::TimeAsString(mTime, true)
+        << ","      << mHash
+        << ",\""    << std::regex_replace(GetFullPath().string(), regex, "\"\"") << "\""
+        << ",\""    << std::regex_replace(GetSourcePath().string(), regex, "\"\"") << "\"";
+    return ss.str();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CRepoFile::StaticLogStats()
 {
-    CLogger::Log("hashed:  " + CHelpers::NumberAsString(sFilesHashed, 15)   + " files " + CHelpers::NumberAsString(sBytesHashed, 19)    + " bytes");
-    CLogger::Log("copied:  " + CHelpers::NumberAsString(sFilesCopied, 15)   + " files " + CHelpers::NumberAsString(sBytesCopied, 19)    + " bytes");
-    CLogger::Log("linked:  " + CHelpers::NumberAsString(sFilesLinked, 15)   + " files " + CHelpers::NumberAsString(sBytesLinked, 19)    + " bytes");
-    CLogger::Log("deleted: " + CHelpers::NumberAsString(sFilesDeleted, 15)  + " files " + CHelpers::NumberAsString(sBytesDeleted, 19)   + " bytes");
+    CLogger::GetInstance().Log("hashed:  " + Helpers::NumberAsString(sFilesHashed, 11)   + " files " + Helpers::NumberAsString(sBytesHashed, 19)    + " bytes");
+    CLogger::GetInstance().Log("copied:  " + Helpers::NumberAsString(sFilesCopied, 11)   + " files " + Helpers::NumberAsString(sBytesCopied, 19)    + " bytes");
+    CLogger::GetInstance().Log("linked:  " + Helpers::NumberAsString(sFilesLinked, 11)   + " files " + Helpers::NumberAsString(sBytesLinked, 19)    + " bytes");
+    CLogger::GetInstance().Log("deleted: " + Helpers::NumberAsString(sFilesDeleted, 11)  + " files " + Helpers::NumberAsString(sBytesDeleted, 19)   + " bytes");
 
     sFilesHashed  = 0;
     sFilesCopied  = 0;

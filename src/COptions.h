@@ -1,27 +1,31 @@
 #pragma once
 
-#include "CHelpers.h"
+#include <string>
+#include <map>
+#include <vector>
 
 class COptions
 {
 public:
-    bool verbose            = false;
-    bool alwaysHash         = false;
-    bool skipUnchanged      = false;
-    bool verifyHashes       = false;
-    bool writeFileTable     = false;
-    bool compactDB          = false;
-    bool verifyAccessible   = false;
+    COptions() = default;
+    COptions(const std::vector<std::string> boolNames, const std::vector<std::string> stringNames);
 
-    int mHardLinkMinBytes = 512 + 1;
+    void SetOptionsSpec(const std::vector<std::string> boolNames, const std::vector<std::string> stringNames);
 
-    std::string suffix;
+    std::string GetUsageString() const;
 
-    // would need automatic sync to usage message
-    //bool ParseCmdLineArg(const std::string& cmdLineArg);
+    bool IsCmdLineOption(const std::string& arg);
+    bool ParseCmdLineArg(const std::string& arg);
+
+    bool        GetBool(const std::string& name) const;
+    std::string GetString(const std::string& name) const;
 
     void Log() const;
 
-    static COptions& GetSingletonNonConst();
-    static const COptions& GetSingleton();
+private:
+    std::vector<std::string> mBoolNames;
+    std::vector<std::string> mStringNames;
+
+    std::map<std::string, bool>         mBoolOpts;
+    std::map<std::string, std::string>  mStringOpts;
 };

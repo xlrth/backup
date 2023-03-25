@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 class CSize
 {
 public:
@@ -11,6 +13,7 @@ public:
     CSize(const CSize&) = default;
 
     CSize(long long value);
+    CSize(std::uintmax_t value);
 
     operator long long() const;
 

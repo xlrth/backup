@@ -1,16 +1,19 @@
 #pragma once
 
-#include <experimental/filesystem>
+#include <filesystem>
 
-class CPath : public std::experimental::filesystem::path
+class CPath : public std::filesystem::path
 {
 public:
     CPath() = default;
     CPath(CPath&&) = default;
     CPath(const CPath&) = default;
 
-    CPath(const std::experimental::filesystem::path& other);
-    CPath(std::experimental::filesystem::path&& other);
+    CPath(const std::filesystem::path& other);
+    CPath(std::filesystem::path&& other);
+
+    CPath(const std::wstring& s);
+    CPath(std::wstring&& s);
 
     CPath(const std::string& s);
     CPath(std::string&& s);
@@ -20,9 +23,11 @@ public:
     CPath& operator = (CPath&& other) = default;
     CPath& operator = (const CPath& other) = default;
     CPath& operator /= (const CPath& other);
+    CPath& operator += (const CPath& other);
+
+    std::string u8StringAsString() const;
 
 private:
     void FixLongPath();
 };
 
-CPath operator / (const CPath& _Left, const CPath& _Right);

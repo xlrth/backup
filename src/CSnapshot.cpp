@@ -1,10 +1,11 @@
 #include "CSnapshot.h"
 
-#include <experimental/filesystem>
+#include <filesystem>
 
-#include "CHelpers.h"
+#include "CLogger.h"
+#include "Helpers.h"
 
-static constexpr bool DB_COLUMNS_FILE_SIZE_DATE_HASH_ARCHIVE = true;
+static constexpr bool DB_COLUMNS_SOURCE_SIZE_TIME_HASH_FILE = true;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -25,16 +26,16 @@ bool CSnapshot::CIterator::HasFile()
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 CRepoFile CSnapshot::CIterator::GetNextFile()
 {
-    static_assert(DB_COLUMNS_FILE_SIZE_DATE_HASH_ARCHIVE, "TODO");
+    static_assert(DB_COLUMNS_SOURCE_SIZE_TIME_HASH_FILE, "TODO");
 
     return
     {
-        std::experimental::filesystem::u8path(mStatement.ReadString(0)),
-        mParentPath,
-        std::experimental::filesystem::u8path(mStatement.ReadString(4)),
+        std::filesystem::u8path(mStatement.ReadString(0)),
         mStatement.ReadInt(1),
         mStatement.ReadInt(2),
-        mStatement.ReadString(3)
+        mStatement.ReadString(3),
+        std::filesystem::u8path(mStatement.ReadString(4)),
+        mParentPath
     };
 }
 
@@ -47,9 +48,31 @@ CRepoFile CSnapshot::CIterator::GetNextFile()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-CSnapshot::CSnapshot(const CPath& path, EOpenMode openMode)
+bool CSnapshot::StaticIsExsting(const CPath& path)
 {
-    Open(path, openMode);
+    return std::filesystem::exists(path / DB_FILE_PATH);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void CSnapshot::StaticValidate(const CPath& path)
+{
+    CPath canonicalPath = std::filesystem::weakly_canonical(path);
+    if (!StaticIsExsting(canonicalPath))
+    {
+        throw "snapshot invalid, sqlite file missing: " + (canonicalPath / DB_FILE_PATH).string();
+    }
+    if (std::filesystem::exists(canonicalPath / IN_PROGRESS_FILE_PATH))
+    {
+        throw "snapshot is unfinished, delete either " + IN_PROGRESS_FILE_PATH.string() + " or whole snapshot: " + canonicalPath.string();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+CSnapshot::CSnapshot(const CPath& path, bool create)
+{
+    Open(path, create);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,109 +84,97 @@ CSnapshot::~CSnapshot()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-bool CSnapshot::IsValidPath(const CPath& path)
-{
-    auto sqliteFile = path / "hash.sqlite";
-
-    return std::experimental::filesystem::exists(sqliteFile)
-        && std::experimental::filesystem::is_regular_file(sqliteFile);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-const CPath& CSnapshot::GetPath() const
+const CPath& CSnapshot::GetAbsolutePath() const
 {
     return mPath;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void CSnapshot::Open(const CPath& path, EOpenMode openMode)
+CPath CSnapshot::GetMetaDataPath() const
 {
-    VERIFY(!mDb.IsOpen());
+    return mPath / META_DATA_PATH;
+}
 
-    mPath = path;
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void CSnapshot::Open(const CPath& path, bool create)
+{
+    VERIFY(!mSqliteDB.IsOpen());
 
-    if (std::experimental::filesystem::exists(mPath / "IN_PROGRESS"))
+    // use normalized path, so we always have the same max path limits
+    mPath = std::filesystem::weakly_canonical(path);
+
+    if (create)
     {
-        throw "snapshot is incomplete: " + mPath.string();
+        if (std::filesystem::exists(mPath))
+        {
+            throw "snapshot directory already exists: " + mPath.string();
+        }
+        std::error_code errorCode;
+        if (!std::filesystem::create_directories(GetMetaDataPath(), errorCode))
+        {
+            throw "cannot create snapshot directories: " + GetMetaDataPath().string() + ": " + errorCode.message();
+        }
+    }
+    else
+    {
+        StaticValidate(mPath);
+
+        Helpers::MakeBackup(mPath / DB_FILE_PATH);
+        Helpers::MakeWritable(mPath / DB_FILE_PATH);
     }
 
-    mSqliteFile = mPath / "hash.sqlite";
-
-    if (openMode == EOpenMode::READ)
-    {
-        if (!std::experimental::filesystem::exists(mSqliteFile))
-        {
-            throw "snapshot invalid, sqlite file missing: " + mPath.string();
-        }
-
-        DBInitRead();
-    }
-    else if (openMode == EOpenMode::WRITE)
-    {
-        if (!std::experimental::filesystem::exists(mSqliteFile))
-        {
-            throw "snapshot invalid, sqlite file missing: " + mPath.string();
-        }
-        mLockFilePath = mPath / "IN_PROGRESS";
-        mLockFileHandle.open(mLockFilePath.string());
-        if (!mLockFileHandle.is_open())
-        {
-            throw "Cannot create lock file in " + mPath.string();
-        }
-
-        CHelpers::MakeBackup(mSqliteFile);
-        CHelpers::MakeWritable(mSqliteFile);
-
-        DBInitWrite();
-    }
-    else if (openMode == EOpenMode::CREATE)
-    {
-        if (std::experimental::filesystem::exists(mPath))
-        {
-            throw "snapshot already existing: " + mPath.string();
-        }
-        if (!std::experimental::filesystem::create_directory(mPath))
-        {
-            throw "Cannot create directory " + mPath.string();
-        }
-        mLockFilePath = mPath / "IN_PROGRESS";
-        mLockFileHandle.open(mLockFilePath.string());
-        if (!mLockFileHandle.is_open())
-        {
-            throw "Cannot create lock file in " + mPath.string();
-        }
-
-        DBInitCreate();
-    }
+    DBInit();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CSnapshot::Close()
 {
-    if (mDb.IsOpen())
+    if (mSqliteDB.IsOpen())
     {
-        mDb.Close();
+        mSqliteDB.Close();
 
-        if (mLockFileHandle.is_open())
-        {
-            CHelpers::MakeReadOnly(mSqliteFile);
-            CHelpers::MakeBackup(mSqliteFile);
-
-            mLockFileHandle.close();
-            if (!std::experimental::filesystem::remove(mLockFilePath))
-            {
-                throw "cannot remove lock file: " + mLockFilePath.string();
-            }
-        }
+        Helpers::MakeReadOnly(mPath / DB_FILE_PATH);
+        Helpers::MakeBackup(mPath / DB_FILE_PATH);
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-CRepoFile CSnapshot::FindFile(const CRepoFile& constraints, bool verifyAccessible, bool preferLinkable) const
+void CSnapshot::SetInProgress()
+{
+    VERIFY(!IsInProgress());
+    std::ofstream file((mPath / IN_PROGRESS_FILE_PATH).string());
+    if (!IsInProgress())
+    {
+        throw "cannot set in progress: " + mPath.string();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void CSnapshot::ClearInProgress()
+{
+    VERIFY(IsInProgress());
+    std::filesystem::remove(mPath / IN_PROGRESS_FILE_PATH);
+    if (IsInProgress())
+    {
+        throw "cannot clear in progress: " + mPath.string();
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+bool CSnapshot::IsInProgress()
+{
+    return std::filesystem::exists(mPath / IN_PROGRESS_FILE_PATH);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+CRepoFile CSnapshot::FindFile(const CRepoFile& constraints, bool preferLinkable) const
 {
     CRepoFile unlinkableFile;
 
@@ -171,10 +182,6 @@ CRepoFile CSnapshot::FindFile(const CRepoFile& constraints, bool verifyAccessibl
     while (iterator.HasFile())
     {
         CRepoFile file = iterator.GetNextFile();
-        if (verifyAccessible && !file.Open())
-        {
-            continue;
-        }
         if (!preferLinkable || file.IsLinkable())
         {
             return file;
@@ -190,6 +197,7 @@ CRepoFile CSnapshot::FindFile(const CRepoFile& constraints, bool verifyAccessibl
 std::vector<CRepoFile> CSnapshot::FindAllFiles(const CRepoFile& constraints) const
 {
     std::vector<CRepoFile> result;
+    result.reserve(1000);
 
     auto iterator = DBSelect(constraints);
     while (iterator.HasFile())
@@ -202,39 +210,16 @@ std::vector<CRepoFile> CSnapshot::FindAllFiles(const CRepoFile& constraints) con
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-bool CSnapshot::ImportFile(const CPath& source, CRepoFile& target)
-{
-    VERIFY(!target.GetRelativePath().empty());
-    VERIFY(!target.GetHash().empty());
-    VERIFY(target.GetSize().IsSpecified());
-    VERIFY(target.GetDate().IsSpecified());
-
-    target.SetSourcePath(source);
-    target.SetParentPath(GetPath());
-
-    if (!target.Copy(source))
-    {
-        return false;
-    }
-    
-    DBInsert(target);
-
-    return true;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-bool CSnapshot::DuplicateFile(const CPath& source, CRepoFile& target)
+bool CSnapshot::InsertFile(const CPath& source, const CRepoFile& target, bool preferLink)
 {
     VERIFY(!target.GetSourcePath().empty());
-    VERIFY(!target.GetRelativePath().empty());
-    VERIFY(!target.GetHash().empty());
+    VERIFY(target.HasHash());
     VERIFY(target.GetSize().IsSpecified());
-    VERIFY(target.GetDate().IsSpecified());
+    VERIFY(target.GetTime().IsSpecified());
+    VERIFY(!target.GetRelativePath().empty());
+    VERIFY(target.GetParentPath() == GetAbsolutePath());
 
-    target.SetParentPath(GetPath());
-
-    if (!target.Link(source) && !target.Copy(source))
+    if (!(preferLink && target.Link(source)) && !target.Copy(source))
     {
         return false;
     }
@@ -262,24 +247,24 @@ bool CSnapshot::DeleteFile(CRepoFile& repoFile)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 CSnapshot::CIterator CSnapshot::DBSelect(const CRepoFile& constraints) const
 {
-    std::string query = "select * from HASH " + DBFormatConstraints(constraints);
+    std::string query = "select * from FILES " + DBFormatConstraints(constraints);
 
-    return { mDb.StartQuery(query), mPath };
+    return { mSqliteDB.StartQuery(query), mPath };
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CSnapshot::DBInsert(const CRepoFile& file)
 {
-    static_assert(DB_COLUMNS_FILE_SIZE_DATE_HASH_ARCHIVE, "TODO");
+    static_assert(DB_COLUMNS_SOURCE_SIZE_TIME_HASH_FILE, "TODO");
 
-    mDb.RunQuery(
-        "insert into HASH values ("
-        "\"" + file.GetSourcePath().u8string() + "\", "
+    mSqliteDB.RunQuery(
+        std::string("insert into FILES values (")
+        + "\"" + file.GetSourcePath().u8StringAsString() + "\", "
         + std::to_string(file.GetSize()) + ", "
-        + std::to_string(file.GetDate()) + ", "
+        + std::to_string(file.GetTime()) + ", "
         + "\"" + file.GetHash() + "\", "
-        "\"" + file.GetRelativePath().u8string() + "\""
+        + "\"" + file.GetRelativePath().u8StringAsString() + "\""
         + ")");
 }
 
@@ -287,105 +272,68 @@ void CSnapshot::DBInsert(const CRepoFile& file)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CSnapshot::CSnapshot::DBDelete(const CRepoFile& constraints)
 {
-    // HACK FOR OLD DBs date format: 
-    CRepoFile constraintsMod = constraints;
-    constraintsMod.SetDate(CDate::UNSPECIFIED);
-    // TODO: ALSO ADD MISSING ASSERT IN SQLITEWRAPPER
-    // TODO: ALSO REMOVE BACKUP BEFORE WRITING?? 
-    // TODO: BACKWARD COMPATIBILITY SWITCH??? --> WOLFGANG FRAGEN!
-
-    mDb.RunQuery("delete from HASH " + DBFormatConstraints(constraintsMod));
+    mSqliteDB.RunQuery("delete from FILES " + DBFormatConstraints(constraints));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void CSnapshot::CSnapshot::DBVerify()
+bool CSnapshot::CSnapshot::DBCheckIntegrity()
 {
-    mDb.RunQuery("pragma integrity_check");
+    auto statement = mSqliteDB.StartQuery("pragma integrity_check");
+    VERIFY(statement.HasData());
+    return statement.ReadString(0) == "ok";
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CSnapshot::CSnapshot::DBCompact()
 {
-    mDb.RunQuery("vacuum");
+    mSqliteDB.RunQuery("vacuum");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void CSnapshot::DBInitRead()
+void CSnapshot::DBInit()
 {
-    mDb = CSqliteWrapper(mSqliteFile.string().c_str(), true);
-    mDb.RunQuery("pragma cache_size = 1000000");
-#if 0 // HACK FOR UPDATE OLD DBS WITH MISSING INDEX
-    if (!mDb.StartQuery("SELECT * FROM sqlite_master where name = \"HASH_idx_ARCHIVE\"").HasData())
-    {
-        mDb.Close();
-        CHelpers::MakeBackup(mSqliteFile);
-        CHelpers::MakeWritable(mSqliteFile);
-        mDb = CSqliteWrapper(mSqliteFile.string().c_str(), false);
-        mDb.RunQuery("create unique index HASH_idx_ARCHIVE on HASH (ARCHIVE, FILE, SIZE, DATE, HASH)");
-        mDb.Close();
-        CHelpers::MakeReadOnly(mSqliteFile);
-        CHelpers::MakeBackup(mSqliteFile);
-        DBInitRead();
-    }
-#endif
-}
+    static_assert(DB_COLUMNS_SOURCE_SIZE_TIME_HASH_FILE, "TODO");
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-void CSnapshot::DBInitWrite()
-{
-    mDb = CSqliteWrapper(mSqliteFile.string().c_str(), false);
-    mDb.RunQuery("pragma cache_size = 1000000");
-    mDb.RunQuery("pragma synchronous = off");
-    mDb.RunQuery("pragma secure_delete = off");
-    mDb.RunQuery("pragma journal_mode = off");
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-void CSnapshot::DBInitCreate()
-{
-    static_assert(DB_COLUMNS_FILE_SIZE_DATE_HASH_ARCHIVE, "TODO");
-
-    mDb = CSqliteWrapper(mSqliteFile.string().c_str(), false);
-    mDb.RunQuery("pragma cache_size = 1000000");
-    mDb.RunQuery("pragma synchronous = off");
-    mDb.RunQuery("pragma secure_delete = off");
-    mDb.RunQuery("pragma journal_mode = off");
-    mDb.RunQuery("create table HASH (FILE text not null, SIZE integer not null, DATE integer not null, HASH text not null, ARCHIVE text not null)");
-    mDb.RunQuery("create unique index HASH_idx_ARCHIVE on HASH (ARCHIVE, FILE, SIZE, DATE, HASH)");
-    mDb.RunQuery("create index HASH_idx_HASH on HASH (HASH, FILE, SIZE, DATE, ARCHIVE)");
+    mSqliteDB = CSqliteWrapper(mPath / DB_FILE_PATH, false);
+    mSqliteDB.RunQuery("pragma locking_mode = exclusive");
+    mSqliteDB.RunQuery("pragma cache_size = 1000000");
+    mSqliteDB.RunQuery("pragma synchronous = off");
+    mSqliteDB.RunQuery("pragma secure_delete = off");
+    mSqliteDB.RunQuery("pragma journal_mode = off");
+    mSqliteDB.RunQuery("create table if not exists FILES (SOURCE text not null, SIZE integer not null, TIME integer not null, HASH text not null, FILE text not null)");
+    mSqliteDB.RunQuery("create unique index if not exists FILES_SOURCE_SIZE_TIME_HASH_FILE on FILES (SOURCE, SIZE, TIME, HASH, FILE)");
+    mSqliteDB.RunQuery("create index if not exists FILES_HASH on FILES (HASH)");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 std::string CSnapshot::DBFormatConstraints(const CRepoFile& constraints)
 {
-    static_assert(DB_COLUMNS_FILE_SIZE_DATE_HASH_ARCHIVE, "TODO");
+    static_assert(DB_COLUMNS_SOURCE_SIZE_TIME_HASH_FILE, "TODO");
 
     std::vector<std::string> constraintStrings;
     if (!constraints.GetSourcePath().empty())
     {
-        constraintStrings.push_back("FILE=\"" + constraints.GetSourcePath().u8string() + "\"");
+        constraintStrings.push_back("SOURCE=\"" + constraints.GetSourcePath().u8StringAsString() + "\"");
     }
     if (constraints.GetSize().IsSpecified())
     {
         constraintStrings.push_back("SIZE=" + std::to_string(constraints.GetSize()));
     }
-    if (constraints.GetDate().IsSpecified())
+    if (constraints.GetTime().IsSpecified())
     {
-        constraintStrings.push_back("DATE=" + std::to_string(constraints.GetDate()));
+        constraintStrings.push_back("TIME=" + std::to_string(constraints.GetTime()));
     }
-    if (!constraints.GetHash().empty())
+    if (constraints.HasHash())
     {
         constraintStrings.push_back("HASH=\"" + constraints.GetHash() + "\"");
     }
     if (!constraints.GetRelativePath().empty())
     {
-        constraintStrings.push_back("ARCHIVE=\"" + constraints.GetRelativePath().u8string() + "\"");
+        constraintStrings.push_back("FILE=\"" + constraints.GetRelativePath().u8StringAsString() + "\"");
     }
 
     std::string result;

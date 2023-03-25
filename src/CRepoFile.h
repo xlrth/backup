@@ -6,7 +6,7 @@
 
 #include "CPath.h"
 #include "CSize.h"
-#include "CDate.h"
+#include "CTime.h"
 
 class CRepoFile
 {
@@ -16,39 +16,39 @@ public:
     CRepoFile(const CRepoFile&) = default;
 
     CRepoFile(
-        CPath           sourcePath          ,
-        CPath           parentPath          ,
-        CPath           relativePath        ,
-        CSize           size                ,
-        CDate           date                ,
-        std::string     hash                );
-
-    bool IsExisting() const;    
-    bool IsLinkable() const;
+        CPath           sourcePath,
+        CSize           size,
+        CTime           time,
+        std::string     hash,
+        CPath           relativePath,
+        CPath           parentPath);
 
     CPath               GetSourcePath() const;
-    CPath               GetParentPath() const;
-    CPath               GetRelativePath() const;
     CSize               GetSize() const;
-    CDate               GetDate() const;
+    CTime               GetTime() const;
     const std::string&  GetHash() const;
-
-    void SetSourcePath(const CPath& sourcePath);
-    void SetParentPath(const CPath& parentPath);
-    void SetRelativePath(const CPath& relativePath);
-    void SetSize(CSize size);
-    void SetDate(CDate date);
-    void SetHash(const std::string& hash);
-
-    bool OpenSource();
-    void CloseSource();
-    bool HashSource();
-
-    bool Open();
-    void Close();
-    bool Hash();
+    bool                HasHash() const;
+    CPath               GetRelativePath() const;
+    CPath               GetParentPath() const;
 
     CPath GetFullPath() const;
+
+    void SetSourcePath(const CPath& sourcePath);
+    void SetSize(CSize size);
+    void SetTime(CTime time);
+    void SetHash(const std::string& hash);
+    void SetRelativePath(const CPath& relativePath);
+    void SetParentPath(const CPath& parentPath);
+
+    bool IsExisting() const;
+    bool IsLinkable() const;
+
+    bool LockSource();
+    void UnlockSource();
+    bool HashSource();
+    bool IsSourceLocked();
+
+    bool Hash();
 
     std::string SourceToString() const;
     std::string ToString() const;
@@ -59,25 +59,23 @@ public:
 
     bool Delete();
 
-    bool ReadFileInfo(unsigned long long& fileSystemIndex, int& hardLinkCount) const;
+    unsigned long long GetFileSystemIndex() const;
 
     CRepoFile& operator = (CRepoFile&& other) = default;
     CRepoFile& operator = (const CRepoFile& other) = default;
-//    bool operator != (const CRepoFile& other) const;
 
 public: // static
     static void StaticLogStats();
 
 private:
     CPath           mSourcePath;
-    CPath           mParentPath;
-    CPath           mRelativePath;
     CSize           mSize;
-    CDate           mDate;
+    CTime           mTime;
     std::string     mHash;
+    CPath           mRelativePath;
+    CPath           mParentPath;
 
     std::shared_ptr<std::ifstream>   mSourceFileHandle;
-    std::shared_ptr<std::ifstream>   mFileHandle;
 
 private: // static
     static long long   sFilesHashed;

@@ -1,2 +1,2 @@
-# function
-- fix sym links
+licence-related stuff
+wildcards for excludes / regex
