@@ -402,6 +402,11 @@ void CCmdBackup::BackupEntryRecursive(const CPath& sourcePath, const CPath& targ
 
     if (std::filesystem::is_directory(sourcePath))
     {
+        if (!mOptions.GetBool("incremental") && !Helpers::CreateDirectory(mTargetSnapshot->GetAbsolutePath() / targetPathRelative))
+        {
+            CLogger::GetInstance().LogError("cannot create directory, excluding: " + sourcePath.string());
+            return;
+        }
         for (auto& entry : std::filesystem::directory_iterator(sourcePath))
         {
             BackupEntryRecursive(entry.path(), targetPathRelative / entry.path().filename());

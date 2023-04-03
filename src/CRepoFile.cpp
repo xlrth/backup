@@ -8,6 +8,7 @@
 #   define WIN32_LEAN_AND_MEAN
 #   include <windows.h>
 #   include <io.h> 
+#   undef CreateDirectory
 #else
 #   include <sys/stat.h>
 #   include <fcntl.h>
@@ -282,10 +283,8 @@ bool CRepoFile::Copy(const CPath& source) const
 {
     std::error_code errorCode;
 
-    CPath directory = GetFullPath().parent_path();
-    if (!std::filesystem::exists(directory) && !std::filesystem::create_directories(directory, errorCode))
+    if (!Helpers::CreateDirectory(GetFullPath().parent_path()))
     {
-        CLogger::GetInstance().LogWarning("cannot create directories: " + ToString(), errorCode);
         return false;
     }
 
@@ -329,10 +328,8 @@ bool CRepoFile::Link(const CPath& source) const
 
     std::error_code errorCode;
 
-    CPath directory = GetFullPath().parent_path();
-    if (!std::filesystem::exists(directory) && !std::filesystem::create_directories(directory, errorCode))
+    if (!Helpers::CreateDirectory(GetFullPath().parent_path()))
     {
-        CLogger::GetInstance().LogWarning("cannot create directories: " + ToString(), errorCode);
         return false;
     }
 

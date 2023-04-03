@@ -23,6 +23,7 @@ namespace Helpers
     bool MakeWritable(const CPath& file);
     void MakeBackup(const CPath& file);
 
+    bool CreateDirectory(const CPath& dir);
     void DeleteEmptyDirectories(const CPath& dir);
 
     bool IsPrefixOfPath(const CPath& prefix, const CPath& path);
