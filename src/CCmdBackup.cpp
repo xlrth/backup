@@ -337,7 +337,7 @@ CPath CCmdBackup::FormatTargetPath(const CPath& sourcePath)
 
 #ifdef _WIN32
     std::replace(targetStr.begin(), targetStr.end(), L':', L'#');
-    std::replace(targetStr.begin(), targetStr.end(), L'\\', L'/');
+    std::replace(targetStr.begin(), targetStr.end(), L'\\', L'#');
 #else
     std::replace(targetStr.begin(), targetStr.end(), L'/', L'#');
 #endif
