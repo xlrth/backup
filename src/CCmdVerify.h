@@ -20,4 +20,3 @@ private:
     void PrintHelp();
     void VerifyFiles(CFileTable& fileTable, const CSnapshot& snapshot, int snapshotIdx, const COptions& options);
 };
-

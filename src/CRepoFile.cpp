@@ -381,7 +381,7 @@ unsigned long long CRepoFile::GetFileSystemIndex() const
     HANDLE handle = CreateFileW(GetFullPath().wstring().c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (handle == INVALID_HANDLE_VALUE)
     {
-        return false;
+        return static_cast<unsigned long long>(-1);
     }
 
     BY_HANDLE_FILE_INFORMATION fileInformation;
