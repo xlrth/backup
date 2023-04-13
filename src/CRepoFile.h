@@ -43,6 +43,7 @@ public:
     bool IsExisting() const;
     bool IsLinkable() const;
 
+    bool ReadSourceProperties();
     bool LockSource();
     void UnlockSource();
     bool HashSource();

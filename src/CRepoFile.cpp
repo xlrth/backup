@@ -192,6 +192,31 @@ bool CRepoFile::IsLinkable() const
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+bool CRepoFile::ReadSourceProperties()
+{
+    std::error_code errorCode;
+
+    auto size = std::filesystem::file_size(GetSourcePath(), errorCode);
+    if (errorCode)
+    {
+        CLogger::GetInstance().LogWarning("cannot get file size: " + ToString(), errorCode);
+        return false;
+    }
+    SetSize(size);
+
+    auto time = std::filesystem::last_write_time(GetSourcePath(), errorCode);
+    if (errorCode)
+    {
+        CLogger::GetInstance().LogWarning("cannot get write time: " + ToString(), errorCode);
+        return false;
+    }
+    SetTime(time);
+
+    return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 bool CRepoFile::LockSource()
 {
     if (mSourceFileHandle)

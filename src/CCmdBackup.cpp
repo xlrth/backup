@@ -393,28 +393,49 @@ void CCmdBackup::BackupEntryRecursive(const CPath& sourcePath, const CPath& targ
         return;
     }
 
-    if (std::filesystem::is_symlink(sourcePath))
+    switch (std::filesystem::symlink_status(sourcePath).type())
     {
+    case std::filesystem::file_type::none:
+    case std::filesystem::file_type::not_found:
+        CLogger::GetInstance().LogError("cannot access, excluding: " + sourcePath.string());
+        return;
+
+    case std::filesystem::file_type::regular:
+        BackupFile(sourcePath, targetPathRelative);
+        return;
+
+    case std::filesystem::file_type::directory:
+        BackupDirectory(sourcePath, targetPathRelative);
+        return;
+
+    case std::filesystem::file_type::symlink:
+#ifdef _WIN32
+    case std::filesystem::file_type::junction:
+#endif
         CLogger::GetInstance().Log("excluding (symbolic link): " + sourcePath.string(), COLOR_EXCLUDE);
         mExcludeCountSymlink++;
         return;
+
+    default:
+        CLogger::GetInstance().Log("excluding (unknown type):  " + sourcePath.string(), COLOR_EXCLUDE);
+        mExcludeCountUnknownType++;
+        return;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void CCmdBackup::BackupDirectory(const CPath& sourcePath, const CPath& targetPathRelative)
+{
+    if (!mOptions.GetBool("incremental") && !Helpers::CreateDirectory(mTargetSnapshot->GetAbsolutePath() / targetPathRelative))
+    {
+        CLogger::GetInstance().LogError("cannot create directory, excluding: " + sourcePath.string());
+        return;
     }
 
-    if (std::filesystem::is_directory(sourcePath))
+    for (auto& entry : std::filesystem::directory_iterator(sourcePath))
     {
-        if (!mOptions.GetBool("incremental") && !Helpers::CreateDirectory(mTargetSnapshot->GetAbsolutePath() / targetPathRelative))
-        {
-            CLogger::GetInstance().LogError("cannot create directory, excluding: " + sourcePath.string());
-            return;
-        }
-        for (auto& entry : std::filesystem::directory_iterator(sourcePath))
-        {
-            BackupEntryRecursive(entry.path(), targetPathRelative / entry.path().filename());
-        }
-    }
-    else
-    {
-        BackupFile(sourcePath, targetPathRelative);
+        BackupEntryRecursive(entry.path(), targetPathRelative / entry.path().filename());
     }
 }
 
@@ -422,15 +443,17 @@ void CCmdBackup::BackupEntryRecursive(const CPath& sourcePath, const CPath& targ
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 void CCmdBackup::BackupFile(const CPath& sourcePath, const CPath& targetPathRelative)
 {
-    CRepoFile targetFile
+    CRepoFile targetFile;
+
+    targetFile.SetSourcePath(sourcePath);
+    targetFile.SetRelativePath(targetPathRelative);
+    targetFile.SetParentPath(mTargetSnapshot->GetAbsolutePath());
+
+    if (!targetFile.ReadSourceProperties())
     {
-        sourcePath,
-        std::filesystem::file_size(sourcePath),
-        std::filesystem::last_write_time(sourcePath),
-        {},
-        targetPathRelative,
-        mTargetSnapshot->GetAbsolutePath()
-    };
+        CLogger::GetInstance().LogError("cannot access, excluding: " + targetFile.SourceToString());
+        return;
+    }
 
     CRepoFile existingFile = mRepository.FindFile(
         { targetFile.GetSourcePath(), targetFile.GetSize(), targetFile.GetTime(), {}, {}, {} },
@@ -502,14 +525,17 @@ bool CCmdBackup::LockAndHash(CRepoFile& targetFile, CRepoFile& existingFile)
     CRepoFile preLockTargetFile = targetFile;
 
     // re-read properties after locking, could have changed since first read
-    targetFile.SetSize(std::filesystem::file_size(targetFile.GetSourcePath()));
-    targetFile.SetTime(std::filesystem::last_write_time(targetFile.GetSourcePath()));
+    if (!targetFile.ReadSourceProperties())
+    {
+        CLogger::GetInstance().LogError("cannot access, excluding: " + targetFile.SourceToString());
+        return false;
+    }
 
     if (   targetFile.GetSize() != preLockTargetFile.GetSize()
         || targetFile.GetTime() != preLockTargetFile.GetTime())
     {
         // file changed as we backup, repeat the search of an existing file.
-        // it is crucial to do an ambiguous signature check later in this method
+        // it is crucial to do a correct signature uniqueness check later in this method
         existingFile = mRepository.FindFile(
             { targetFile.GetSourcePath(), targetFile.GetSize(), targetFile.GetTime(), {}, {}, {} },
             false);
@@ -543,5 +569,9 @@ void CCmdBackup::LogStats()
     if (mExcludeCountSymlink > 0)
     {
         CLogger::GetInstance().Log("excluded (symbolic link): " + std::to_string(mExcludeCountSymlink));
+    }
+    if (mExcludeCountUnknownType > 0)
+    {
+        CLogger::GetInstance().Log("excluded (unknown type):  " + std::to_string(mExcludeCountUnknownType));
     }
 }

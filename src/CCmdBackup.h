@@ -23,6 +23,7 @@ private:
     bool    IsBlacklisted(const CPath& sourcePath);
 
     void BackupEntryRecursive(const CPath& sourcePath, const CPath& targetPathRelative);
+    void BackupDirectory(const CPath& sourcePath, const CPath& targetPathRelative);
     void BackupFile(const CPath& sourcePath, const CPath& targetPathRelative);
     bool LockAndHash(CRepoFile& targetFile, CRepoFile& existingFile);
     void LogStats();
@@ -33,6 +34,7 @@ private:
     CRepository                 mRepository;
     std::shared_ptr<CSnapshot>  mTargetSnapshot;
 
-    long long mExcludeCountBlacklisted;
-    long long mExcludeCountSymlink;
+    long long mExcludeCountBlacklisted  = 0;
+    long long mExcludeCountSymlink      = 0;
+    long long mExcludeCountUnknownType  = 0;
 };
