@@ -11,6 +11,12 @@
 #include "CCmdDistill.h"
 #include "CCmdClone.h"
 
+#ifdef _WIN32
+#   define WIN32_LEAN_AND_MEAN
+#   include <windows.h>
+#   undef max
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 std::vector<std::pair<std::string, std::shared_ptr<CCmd>>> CreateCommands()
@@ -27,7 +33,23 @@ std::vector<std::pair<std::string, std::shared_ptr<CCmd>>> CreateCommands()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-void PrintUsage(const CPath& executablePath)
+CPath GetExecutablePath(const char* argv0)
+{
+#ifdef _WIN32
+    WCHAR result[1024] = { '\0' };
+    if (0 == ::GetModuleFileName(NULL, result, 1024))
+    {
+        return argv0;
+    }
+    return std::wstring(result);
+#else
+    return argv0;
+#endif
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+void PrintUsage(const char* argv0)
 {
     int COL1 = 8;
     int COL2 = 37;
@@ -35,7 +57,7 @@ void PrintUsage(const CPath& executablePath)
     for (auto& command : CreateCommands())
     {
         CLogger::GetInstance().Log(
-            "  " + std::filesystem::canonical(executablePath).filename().string() 
+            "  " + GetExecutablePath(argv0).filename().string()
             + " " + command.first + std::string(std::max(0, COL1 - int(command.first.length())), ' ')
             + command.second->GetUsageSpec() + std::string(std::max(0, COL2 - int(command.second->GetUsageSpec().length())), ' ')
             + command.second->GetOptionsSpec().GetUsageString());

@@ -28,6 +28,6 @@ public:
     std::string u8StringAsString() const;
 
 private:
-    void FixLongPath();
+    void CheckPathLength();
 };
 
