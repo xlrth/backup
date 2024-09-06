@@ -36,6 +36,7 @@ inline static const std::string COLOR_FATAL                 = COLOR_BRIGHT_RED;
 inline static const std::string COLOR_COPY                  = COLOR_DARK_GREEN;
 inline static const std::string COLOR_COPY_SMALL            = COLOR_BRIGHT_BLACK;
 inline static const std::string COLOR_LINK                  = COLOR_BRIGHT_CYAN;
+inline static const std::string COLOR_LINK_LIMIT            = COLOR_DARK_YELLOW;
 inline static const std::string COLOR_DELETE                = COLOR_DARK_MAGENTA;
 
 // verbose high-level

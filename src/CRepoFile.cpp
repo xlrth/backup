@@ -183,7 +183,7 @@ bool CRepoFile::IsLinkable() const
 
     if (hardLinkCount >= MAX_HARD_LINK_COUNT)
     {
-        CLogger::GetInstance().LogWarning("hard link limit reached: " + ToString(), errorCode);
+        LOG_DEBUG("hard link limit reached: " + ToString(), COLOR_DARK_YELLOW);
         return false;
     }
 

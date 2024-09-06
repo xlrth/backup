@@ -489,7 +489,7 @@ void CCmdBackup::BackupFile(const CPath& sourcePath, const CPath& targetPathRela
 
     if (existingFile.HasHash())
     {
-        if (mTargetSnapshot->InsertFile(existingFile.GetFullPath(), targetFile, true))
+        if (mTargetSnapshot->InsertFile(existingFile.GetFullPath(), targetFile, existingFile.IsLinkable()))
         {
             LOG_DEBUG("duplicated: " + targetFile.SourceToString(), COLOR_DUP);
             return;
