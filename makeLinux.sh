@@ -1,5 +1,5 @@
 #!/bin/bash
-c++ -o backup -flto=auto -O3 -std=c++20 -fno-char8_t \
+c++ -o backup -flto=auto -O3 -std=c++20 \
 -lsqlite3 -lstdc++fs    \
 src/CCmdBackup.cpp      \
 src/CCmdClone.cpp       \

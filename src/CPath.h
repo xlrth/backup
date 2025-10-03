@@ -20,6 +20,9 @@ public:
 
     CPath(const char* s);
 
+    CPath(const std::u8string& s);
+    CPath(std::u8string&& s);
+
     CPath& operator = (CPath&& other) = default;
     CPath& operator = (const CPath& other) = default;
     CPath& operator /= (const CPath& other);

@@ -228,12 +228,14 @@ void CCmdBackup::ReadConfig(const CPath& configPath)
         }
         if (Helpers::ToLower(currentSection) == "sources")
         {
-            mSources.push_back(std::filesystem::u8path(line));
+            // paths in the config file are interpreted as UTF8
+            mSources.push_back(std::filesystem::path(Helpers::ReinterpretStringAsU8String(line)));
             LOG_DEBUG("source: " + mSources.back().string(), COLOR_DEBUG);
         }
         else if (Helpers::ToLower(currentSection) == "excludes")
         {
-            mExcludes.push_back(std::filesystem::u8path(line));
+            // paths in the config file are interpreted as UTF8
+            mExcludes.push_back(std::filesystem::path(Helpers::ReinterpretStringAsU8String(line)));
             LOG_DEBUG("exclude: " + mExcludes.back().string(), COLOR_DEBUG);
         }
         else
