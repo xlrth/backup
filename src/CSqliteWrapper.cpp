@@ -1,6 +1,7 @@
 #include "CSqliteWrapper.h"
 
 #include <assert.h>
+#include <sstream>
 
 #include "Helpers.h"
 
@@ -154,3 +155,19 @@ CSqliteWrapper::CStatement CSqliteWrapper::StartQuery(const std::string& query)
     return statement;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+std::string CSqliteWrapper::ToStringLiteral(const std::string& input)
+{
+    std::ostringstream oss;
+    oss << '\'';  // opening quote
+    for (char c : input)
+    {
+        if (c == '\'')
+            oss << "''";   // escape by doubling
+        else
+            oss << c;
+    }
+    oss << '\'';  // closing quote
+    return oss.str();
+}

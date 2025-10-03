@@ -25,8 +25,6 @@ public:
     CPath& operator /= (const CPath& other);
     CPath& operator += (const CPath& other);
 
-    std::string u8StringAsString() const;
-
 private:
     void CheckPathLength();
 };

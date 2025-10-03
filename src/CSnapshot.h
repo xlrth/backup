@@ -57,6 +57,8 @@ public: // methods
 private:
     void DBInit();
 
+    static std::string PathToDBString(const CPath& path);
+    static CPath       DBStringToPath(const std::string& path);
     static std::string DBFormatConstraints(const CRepoFile& constraints);
 
     CPath                       mPath;

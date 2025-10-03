@@ -30,11 +30,11 @@ CRepoFile CSnapshot::CIterator::GetNextFile()
 
     return
     {
-        std::filesystem::u8path(mStatement.ReadString(0)),
+        DBStringToPath(mStatement.ReadString(0)),
         mStatement.ReadInt(1),
         mStatement.ReadInt(2),
         mStatement.ReadString(3),
-        std::filesystem::u8path(mStatement.ReadString(4)),
+        DBStringToPath(mStatement.ReadString(4)),
         mParentPath
     };
 }
@@ -260,11 +260,11 @@ void CSnapshot::DBInsert(const CRepoFile& file)
 
     mSqliteDB.RunQuery(
         std::string("insert into FILES values (")
-        + "\"" + file.GetSourcePath().u8StringAsString() + "\", "
+        + CSqliteWrapper::ToStringLiteral(PathToDBString(file.GetSourcePath())) + ", "
         + std::to_string(file.GetSize()) + ", "
         + std::to_string(file.GetTime()) + ", "
-        + "\"" + file.GetHash() + "\", "
-        + "\"" + file.GetRelativePath().u8StringAsString() + "\""
+        + CSqliteWrapper::ToStringLiteral(file.GetHash()) + ", "
+        + CSqliteWrapper::ToStringLiteral(PathToDBString(file.GetRelativePath()))
         + ")");
 }
 
@@ -310,6 +310,20 @@ void CSnapshot::DBInit()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+std::string CSnapshot::PathToDBString(const CPath& path)
+{
+    return path.u8string();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+CPath CSnapshot::DBStringToPath(const std::string& string)
+{
+    return std::filesystem::u8path(string);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 std::string CSnapshot::DBFormatConstraints(const CRepoFile& constraints)
 {
     static_assert(DB_COLUMNS_SOURCE_SIZE_TIME_HASH_FILE, "TODO");
@@ -317,7 +331,7 @@ std::string CSnapshot::DBFormatConstraints(const CRepoFile& constraints)
     std::vector<std::string> constraintStrings;
     if (!constraints.GetSourcePath().empty())
     {
-        constraintStrings.push_back("SOURCE=\"" + constraints.GetSourcePath().u8StringAsString() + "\"");
+        constraintStrings.push_back("SOURCE=" + CSqliteWrapper::ToStringLiteral(PathToDBString(constraints.GetSourcePath())));
     }
     if (constraints.GetSize().IsSpecified())
     {
@@ -329,11 +343,11 @@ std::string CSnapshot::DBFormatConstraints(const CRepoFile& constraints)
     }
     if (constraints.HasHash())
     {
-        constraintStrings.push_back("HASH=\"" + constraints.GetHash() + "\"");
+        constraintStrings.push_back("HASH=" + CSqliteWrapper::ToStringLiteral(constraints.GetHash()));
     }
     if (!constraints.GetRelativePath().empty())
     {
-        constraintStrings.push_back("FILE=\"" + constraints.GetRelativePath().u8StringAsString() + "\"");
+        constraintStrings.push_back("FILE=" + CSqliteWrapper::ToStringLiteral(PathToDBString(constraints.GetRelativePath())));
     }
 
     std::string result;

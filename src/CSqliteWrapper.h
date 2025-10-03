@@ -41,6 +41,8 @@ public:
     void        RunQuery(const std::string& query);
     CStatement  StartQuery(const std::string& query);
 
+    static std::string ToStringLiteral(const std::string& input);
+
 private:
     sqlite3* mSqliteHandle;
 };
