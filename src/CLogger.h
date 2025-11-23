@@ -52,8 +52,8 @@ inline static const std::string COLOR_PURGE                 = COLOR_BRIGHT_MAGEN
 inline static const std::string COLOR_DISTILL               = COLOR_BRIGHT_CYAN;
 inline static const std::string COLOR_CLONE                 = COLOR_BRIGHT_BLUE;
 
-// code page Windows-1252
-inline static const int WINDOWS_CONSOLE_OUTPUT_CODEPAGE = 1252;
+// code page for windows console
+inline static const int WINDOWS_CONSOLE_OUTPUT_CODEPAGE = 65001; //65001 == UTF-8
 
 // use macro to avoid evaluation of arguments when verbose disabled
 #define LOG_DEBUG(str, color) if (CLogger::GetInstance().IsDebugLogEnabled()) { CLogger::GetInstance().Log((str), (color)); }

@@ -119,6 +119,11 @@ int main(int argc, char** argv)
             PrintUsage(argv[0]);
             return false;
         }
+
+        // UTF-8 preferred for log files and console logging. ==> AVOIDS ANSI CONVERSION ISSUES ON WINDOWS
+        // change code page only after command line parsing, since command line arguments are encoded using ANSI system locale for windows.
+        std::locale::global(std::locale("en_US.UTF-8"));
+
         if (!command->Run(paths, options))
         {
             PrintUsage(argv[0]);

@@ -146,7 +146,7 @@ void CSnapshot::Close()
 void CSnapshot::SetInProgress()
 {
     VERIFY(!IsInProgress());
-    std::ofstream file((mPath / IN_PROGRESS_FILE_PATH).string());
+    std::ofstream file(mPath / IN_PROGRESS_FILE_PATH);
     if (!IsInProgress())
     {
         throw "cannot set in progress: " + mPath.string();
